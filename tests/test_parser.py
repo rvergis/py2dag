@@ -19,7 +19,18 @@ async def plan():
     assert plan["ops"][-1]["id"] == "b"
 
 
-def test_rejects_fstrings_and_subscripts():
+def test_accepts_fstrings():
+    code = '''
+def plan():
+    a = AGENT.op()
+    s = f"val {a}"
+    output(s, as_="o.txt")
+'''
+    plan = parse_src(code)
+    assert any(op["id"] == "s" and op["op"] == "TEXT.format" for op in plan["ops"])  # type: ignore[index]
+
+
+def test_rejects_subscripts_even_in_fstrings():
     code = '''
 def plan():
     a = AGENT.op()

@@ -1,7 +1,7 @@
 import ast
 import json
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 VALID_NAME_RE = re.compile(r'^[a-z_][a-z0-9_]{0,63}$')
 
@@ -52,7 +52,8 @@ def parse(source: str, function_name: str = "plan") -> Dict[str, Any]:
     outputs: List[Dict[str, str]] = []
     settings: Dict[str, Any] = {}
 
-    for stmt in fn.body:
+    returned_var: Optional[str] = None
+    for i, stmt in enumerate(fn.body):
         if isinstance(stmt, ast.Assign):
             if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
                 raise DSLParseError("Assignment targets must be simple names")
@@ -65,25 +66,48 @@ def parse(source: str, function_name: str = "plan") -> Dict[str, Any]:
             value = stmt.value
             if isinstance(value, ast.Await):
                 value = value.value
-            if not isinstance(value, ast.Call):
-                raise DSLParseError("Right hand side must be a call")
-            op_name = _get_call_name(value.func)
+            if isinstance(value, ast.Call):
+                op_name = _get_call_name(value.func)
 
-            deps: List[str] = []
-            for arg in value.args:
-                if not isinstance(arg, ast.Name):
-                    raise DSLParseError("Positional args must be variable names")
-                if arg.id not in defined:
-                    raise DSLParseError(f"Undefined dependency: {arg.id}")
-                deps.append(arg.id)
+                deps: List[str] = []
+                for arg in value.args:
+                    if not isinstance(arg, ast.Name):
+                        raise DSLParseError("Positional args must be variable names")
+                    if arg.id not in defined:
+                        raise DSLParseError(f"Undefined dependency: {arg.id}")
+                    deps.append(arg.id)
 
-            kwargs: Dict[str, Any] = {}
-            for kw in value.keywords:
-                if kw.arg is None:
-                    raise DSLParseError("**kwargs are not allowed")
-                kwargs[kw.arg] = _literal(kw.value)
+                kwargs: Dict[str, Any] = {}
+                for kw in value.keywords:
+                    if kw.arg is None:
+                        raise DSLParseError("**kwargs are not allowed")
+                    kwargs[kw.arg] = _literal(kw.value)
 
-            ops.append({"id": var_name, "op": op_name, "deps": deps, "args": kwargs})
+                ops.append({"id": var_name, "op": op_name, "deps": deps, "args": kwargs})
+            elif isinstance(value, ast.JoinedStr):
+                # Minimal f-string support: only variable placeholders
+                deps: List[str] = []
+                parts: List[str] = []
+                for item in value.values:
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                        parts.append(item.value)
+                    elif isinstance(item, ast.FormattedValue) and isinstance(item.value, ast.Name):
+                        name = item.value.id
+                        if name not in defined:
+                            raise DSLParseError(f"Undefined dependency: {name}")
+                        deps.append(name)
+                        parts.append("{" + str(len(deps) - 1) + "}")
+                    else:
+                        raise DSLParseError("f-strings may only contain variable names")
+                template = "".join(parts)
+                ops.append({
+                    "id": var_name,
+                    "op": "TEXT.format",
+                    "deps": deps,
+                    "args": {"template": template},
+                })
+            else:
+                raise DSLParseError("Right hand side must be a call or f-string")
             defined.add(var_name)
 
         elif isinstance(stmt, ast.Expr):
@@ -117,11 +141,23 @@ def parse(source: str, function_name: str = "plan") -> Dict[str, Any]:
                 outputs.append({"from": var, "as": filename})
             else:
                 raise DSLParseError("Only settings() and output() calls allowed as expressions")
+        elif isinstance(stmt, ast.Return):
+            if i != len(fn.body) - 1:
+                raise DSLParseError("return must be the last statement")
+            if not isinstance(stmt.value, ast.Name):
+                raise DSLParseError("return must return a variable name")
+            var = stmt.value.id
+            if var not in defined:
+                raise DSLParseError(f"Undefined return variable: {var}")
+            returned_var = var
         else:
-            raise DSLParseError("Only assignments and expression calls are allowed in function body")
+            raise DSLParseError("Only assignments, expression calls, and a final return are allowed in function body")
 
     if not outputs:
-        raise DSLParseError("At least one output() call required")
+        if returned_var is not None:
+            outputs.append({"from": returned_var, "as": "return"})
+        else:
+            raise DSLParseError("At least one output() call required")
     if len(ops) > 200:
         raise DSLParseError("Too many operations")
 
@@ -135,4 +171,3 @@ def parse_file(filename: str, function_name: str = "plan") -> Dict[str, Any]:
     with open(filename, "r", encoding="utf-8") as f:
         src = f.read()
     return parse(src, function_name=function_name)
-

@@ -10,7 +10,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Convert Python function plan to DAG")
     ap.add_argument("file", help="Python file containing the plan function")
     ap.add_argument("--func", default="plan", help="Function name to parse")
-    ap.add_argument("--svg", action="store_true", help="Also export plan.svg")
+    ap.add_argument("--svg", action="store_true", help="Also export plan.svg via Graphviz (requires dot)")
+    ap.add_argument("--html", action="store_true", help="Also export plan.html via Dagre (no system deps)")
     args = ap.parse_args()
 
     plan = dsl_parser.parse_file(args.file, function_name=args.func)
@@ -19,8 +20,14 @@ def main() -> None:
     pseudo_code = pseudo_module.generate(plan)
     with open("plan.pseudo", "w", encoding="utf-8") as f:
         f.write(pseudo_code)
-    if args.svg:
-        export_svg.export(plan, filename="plan.svg")
+    if args.html:
+        from . import export_dagre
+        export_dagre.export(plan, filename="plan.html")
+    elif args.svg:
+        try:
+            export_svg.export(plan, filename="plan.svg")
+        except RuntimeError as e:
+            print(f"Warning: SVG export skipped: {e}")
 
 
 if __name__ == "__main__":  # pragma: no cover

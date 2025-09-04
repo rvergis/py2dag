@@ -12,9 +12,7 @@ pip install py2dag
 - From source using Makefile targets (recommended for development):
 
 ```
-make setup         # install deps
-make setup-svg     # install deps incl. SVG extra
-make setup-venv    # create/use local .venv and install
+make setup         # create .venv and install deps (SVG extra by default)
 ```
 
 ## Dev Environment via Makefile
@@ -26,36 +24,36 @@ make setup-venv    # create/use local .venv and install
 poetry install
 ```
 
-Note: SVG export also requires the Graphviz system binaries (e.g., `brew install graphviz`).
+Note: HTML export via Dagre needs no system dependencies. Optional Graphviz SVG export requires the Graphviz system binaries (e.g., `brew install graphviz`).
 
 ### Local Virtualenv (.venv)
 
-- Create/update venv and install deps: `make setup-venv`
+- Create/update venv and install deps: `make setup`
 - Open interactive shell inside venv: `make shell`
 - `.venv/` is ignored by git.
 
 ## Usage
 
-- Run via Makefile (dev):
+- Run via Makefile (dev) — generates an interactive Dagre HTML graph:
 
 ```
-make run FILE=path/to/your_file.py ARGS=--svg
+make run FILE=path/to/your_file.py ARGS=--html
 ```
 
 - Run the installed CLI (after `pip install py2dag`):
 
 ```
-py2dag path/to/your_file.py --svg
+py2dag path/to/your_file.py --html
 ```
 
 
 - Or directly with Python (inside venv):
 
 ```
-poetry run python cli.py path/to/your_file.py --svg
+poetry run python cli.py path/to/your_file.py --html
 ```
 
-This generates `plan.json`, `plan.pseudo`, and if `--svg` is used, `plan.svg`.
+This generates `plan.json`, `plan.pseudo`, and if `--html` is used, `plan.html`.
 
 ## Tests
 

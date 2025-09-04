@@ -1,0 +1,10 @@
+frame_id = AGENTYOLO.convert_elapsed_time_to_frame_id(seconds=50.0)
+summary_text = AGENTLLAVA.summarize_video_at_elapsed_time(et=50)
+approx_coords = AGENTKLVR.get_approximate_lat_lon_at_elapsed_time(et=50)
+lat = AGENTKLVR.get_lat(approx_coords)
+lon = AGENTKLVR.get_lon(approx_coords)
+freeway_name = AGENTROADY.get_freeway_details_after_elapsed_time(et=50)
+lane_count = AGENTROADY.get_number_of_lanes_after_elapsed_time(et=50)
+final_summary = TEXT.format(summary_text, lat, lon, freeway_name, lane_count, template="At 50 seconds into the video, {0} The vehicle is at coordinates {1}, {2} on the {3}. There are {4} lanes.")
+
+output(final_summary, as="return")

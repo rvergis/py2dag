@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+
+HTML_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>py2dag Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; }
+    header { padding: 10px 16px; background: #111; color: #eee; font-size: 14px; }
+    #container { padding: 12px; }
+    svg { width: 100%; height: 80vh; border-top: 1px solid #ddd; }
+    .node rect { stroke: #666; fill: #fff; rx: 4; ry: 4; }
+    .node.note rect { fill: #fff8dc; }
+    .edgePath path { stroke: #333; fill: none; stroke-width: 1.2px; }
+  </style>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://unpkg.com/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+</head>
+<body>
+  <header>py2dag — Dagre graph</header>
+  <div id="container">
+    <svg><g/></svg>
+  </div>
+  <script>
+    const plan = __PLAN_JSON__;
+    const g = new dagreD3.graphlib.Graph().setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
+
+    // Add op nodes
+    (plan.ops || []).forEach(op => {
+      g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
+    });
+
+    // Add output nodes and edges from source to output
+    (plan.outputs || []).forEach(out => {
+      const outId = `out:${out.as}`;
+      g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
+      g.setEdge(out.from, outId);
+    });
+
+    // Add dependency edges between ops
+    (plan.ops || []).forEach(op => {
+      (op.deps || []).forEach(dep => {
+        g.setEdge(dep, op.id);
+      });
+    });
+
+    const svg = d3.select('svg');
+    const inner = svg.select('g');
+    const render = new dagreD3.render();
+    render(inner, g);
+
+    // Centering
+    const { width, height } = g.graph();
+    const svgWidth = document.querySelector('svg').clientWidth;
+    const xCenterOffset = (svgWidth - width) / 2;
+    inner.attr('transform', 'translate(' + Math.max(10, xCenterOffset) + ', 20)');
+    svg.attr('height', height + 40);
+  </script>
+</body>
+</html>
+"""
+
+
+def export(plan: Dict[str, Any], filename: str = "plan.html") -> str:
+    """Export the plan as an interactive HTML using Dagre (via dagre-d3).
+
+    Returns the written filename.
+    """
+    html = HTML_TEMPLATE.replace("__PLAN_JSON__", json.dumps(plan))
+    path = Path(filename)
+    path.write_text(html, encoding="utf-8")
+    return str(path)
+

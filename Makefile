@@ -51,4 +51,4 @@ push-tags:
 	@git push --tags
 
 # release: bump patch, tag, and push tags (triggers GitHub Action to publish)
-release: bump-patch tag push-tags
+release: tag push-tags

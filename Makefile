@@ -1,4 +1,5 @@
 .PHONY: setup shell test run build clean version bump-patch tag push-tags release
+.ONESHELL:
 
 # Tooling
 POETRY ?= poetry
@@ -37,26 +38,10 @@ clean:
 # --- Release helpers ---
 
 version:
-	@python3 - <<'PY'
-	import re, pathlib
-	p = pathlib.Path('pyproject.toml').read_text(encoding='utf-8')
-	m = re.search(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', p, flags=re.M)
-	print(m.group(1) if m else '0.0.0')
-	PY
+		@$(PYTHON) scripts/version_utils.py print
 
 bump-patch:
-	@python3 - <<'PY'
-	import re, pathlib
-	path = pathlib.Path('pyproject.toml')
-	text = path.read_text(encoding='utf-8')
-	def repl(m):
-	    major, minor, patch = map(int, m.group(1).split('.'))
-	    patch += 1
-	    return f'version = "{major}.{minor}.{patch}"'
-	new = re.sub(r'(?m)^version\s*=\s*"(\d+\.\d+\.\d+)"', repl, text, count=1)
-	path.write_text(new, encoding='utf-8')
-	print('Bumped to:', re.search(r'(?m)^version\s*=\s*"(.*)"', new).group(1))
-	PY
+		@$(PYTHON) scripts/version_utils.py bump
 
 tag:
 	@v=$$(make -s version); git tag v$$v

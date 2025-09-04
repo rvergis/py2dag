@@ -30,38 +30,58 @@ HTML_TEMPLATE = """<!doctype html>
   </div>
   <script>
     const plan = __PLAN_JSON__;
-    const g = new dagreD3.graphlib.Graph().setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
 
-    // Add op nodes
-    (plan.ops || []).forEach(op => {
-      g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
-    });
+    function showMessage(msg) {
+      const el = document.getElementById('container');
+      el.innerHTML = '<div style="padding:12px;color:#b00;background:#fff3f3;border-top:1px solid #f0caca;">' +
+        msg + '</div>' +
+        '<pre style="margin:0;padding:12px;white-space:pre-wrap;">' +
+        (typeof plan === 'object' ? JSON.stringify(plan, null, 2) : '') + '</pre>';
+    }
 
-    // Add output nodes and edges from source to output
-    (plan.outputs || []).forEach(out => {
-      const outId = `out:${out.as}`;
-      g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
-      g.setEdge(out.from, outId);
-    });
+    if (typeof window.d3 === 'undefined' || typeof window.dagreD3 === 'undefined') {
+      showMessage('Failed to load Dagre assets (d3/dagre-d3). Check internet connectivity or vendor the JS locally.');
+    } else {
+      try {
+        const g = new dagreD3.graphlib.Graph({ multigraph: true })
+          .setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
+        // Ensure edges have an object for labels/attrs to avoid TypeErrors
+        g.setDefaultEdgeLabel(() => ({}));
 
-    // Add dependency edges between ops
-    (plan.ops || []).forEach(op => {
-      (op.deps || []).forEach(dep => {
-        g.setEdge(dep, op.id);
-      });
-    });
+        // Add op nodes
+        (plan.ops || []).forEach(op => {
+          g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
+        });
 
-    const svg = d3.select('svg');
-    const inner = svg.select('g');
-    const render = new dagreD3.render();
-    render(inner, g);
+        // Add output nodes and edges from source to output
+        (plan.outputs || []).forEach(out => {
+          const outId = `out:${out.as}`;
+          g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
+          g.setEdge(out.from, outId);
+        });
 
-    // Centering
-    const { width, height } = g.graph();
-    const svgWidth = document.querySelector('svg').clientWidth;
-    const xCenterOffset = (svgWidth - width) / 2;
-    inner.attr('transform', 'translate(' + Math.max(10, xCenterOffset) + ', 20)');
-    svg.attr('height', height + 40);
+        // Add dependency edges between ops
+        (plan.ops || []).forEach(op => {
+          (op.deps || []).forEach(dep => {
+            g.setEdge(dep, op.id);
+          });
+        });
+
+        const svg = d3.select('svg');
+        const inner = svg.select('g');
+        const render = new dagreD3.render();
+        render(inner, g);
+
+        // Centering
+        const { width, height } = g.graph();
+        const svgWidth = document.querySelector('svg').clientWidth;
+        const xCenterOffset = (svgWidth - width) / 2;
+        inner.attr('transform', 'translate(' + Math.max(10, xCenterOffset) + ', 20)');
+        svg.attr('height', height + 40);
+      } catch (e) {
+        showMessage('Failed to render Dagre graph: ' + e);
+      }
+    }
   </script>
 </body>
 </html>
@@ -77,4 +97,3 @@ def export(plan: Dict[str, Any], filename: str = "plan.html") -> str:
     path = Path(filename)
     path.write_text(html, encoding="utf-8")
     return str(path)
-

@@ -23,38 +23,58 @@
   </div>
   <script>
     const plan = {"version": 1, "ops": [{"id": "frame_id", "op": "AGENTYOLO.convert_elapsed_time_to_frame_id", "deps": [], "args": {"seconds": 50.0}}, {"id": "summary_text", "op": "AGENTLLAVA.summarize_video_at_elapsed_time", "deps": [], "args": {"et": 50}}, {"id": "approx_coords", "op": "AGENTKLVR.get_approximate_lat_lon_at_elapsed_time", "deps": [], "args": {"et": 50}}, {"id": "lat", "op": "AGENTKLVR.get_lat", "deps": ["approx_coords"], "args": {}}, {"id": "lon", "op": "AGENTKLVR.get_lon", "deps": ["approx_coords"], "args": {}}, {"id": "freeway_name", "op": "AGENTROADY.get_freeway_details_after_elapsed_time", "deps": [], "args": {"et": 50}}, {"id": "lane_count", "op": "AGENTROADY.get_number_of_lanes_after_elapsed_time", "deps": [], "args": {"et": 50}}, {"id": "final_summary", "op": "TEXT.format", "deps": ["summary_text", "lat", "lon", "freeway_name", "lane_count"], "args": {"template": "At 50 seconds into the video, {0} The vehicle is at coordinates {1}, {2} on the {3}. There are {4} lanes."}}], "outputs": [{"from": "final_summary", "as": "return"}]};
-    const g = new dagreD3.graphlib.Graph().setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
 
-    // Add op nodes
-    (plan.ops || []).forEach(op => {
-      g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
-    });
+    function showMessage(msg) {
+      const el = document.getElementById('container');
+      el.innerHTML = '<div style="padding:12px;color:#b00;background:#fff3f3;border-top:1px solid #f0caca;">' +
+        msg + '</div>' +
+        '<pre style="margin:0;padding:12px;white-space:pre-wrap;">' +
+        (typeof plan === 'object' ? JSON.stringify(plan, null, 2) : '') + '</pre>';
+    }
 
-    // Add output nodes and edges from source to output
-    (plan.outputs || []).forEach(out => {
-      const outId = `out:${out.as}`;
-      g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
-      g.setEdge(out.from, outId);
-    });
+    if (typeof window.d3 === 'undefined' || typeof window.dagreD3 === 'undefined') {
+      showMessage('Failed to load Dagre assets (d3/dagre-d3). Check internet connectivity or vendor the JS locally.');
+    } else {
+      try {
+        const g = new dagreD3.graphlib.Graph({ multigraph: true })
+          .setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
+        // Ensure edges have an object for labels/attrs to avoid TypeErrors
+        g.setDefaultEdgeLabel(() => ({}));
 
-    // Add dependency edges between ops
-    (plan.ops || []).forEach(op => {
-      (op.deps || []).forEach(dep => {
-        g.setEdge(dep, op.id);
-      });
-    });
+        // Add op nodes
+        (plan.ops || []).forEach(op => {
+          g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
+        });
 
-    const svg = d3.select('svg');
-    const inner = svg.select('g');
-    const render = new dagreD3.render();
-    render(inner, g);
+        // Add output nodes and edges from source to output
+        (plan.outputs || []).forEach(out => {
+          const outId = `out:${out.as}`;
+          g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
+          g.setEdge(out.from, outId);
+        });
 
-    // Centering
-    const { width, height } = g.graph();
-    const svgWidth = document.querySelector('svg').clientWidth;
-    const xCenterOffset = (svgWidth - width) / 2;
-    inner.attr('transform', 'translate(' + Math.max(10, xCenterOffset) + ', 20)');
-    svg.attr('height', height + 40);
+        // Add dependency edges between ops
+        (plan.ops || []).forEach(op => {
+          (op.deps || []).forEach(dep => {
+            g.setEdge(dep, op.id);
+          });
+        });
+
+        const svg = d3.select('svg');
+        const inner = svg.select('g');
+        const render = new dagreD3.render();
+        render(inner, g);
+
+        // Centering
+        const { width, height } = g.graph();
+        const svgWidth = document.querySelector('svg').clientWidth;
+        const xCenterOffset = (svgWidth - width) / 2;
+        inner.attr('transform', 'translate(' + Math.max(10, xCenterOffset) + ', 20)');
+        svg.attr('height', height + 40);
+      } catch (e) {
+        showMessage('Failed to render Dagre graph: ' + e);
+      }
+    }
   </script>
 </body>
 </html>

@@ -14,10 +14,13 @@ except Exception:  # pragma: no cover
 def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
     """Export the plan as an SVG using graphviz.
 
-    Raises RuntimeError with a helpful message if Graphviz system binaries are missing.
+    Writes a true SVG file at `filename`. If Graphviz system binaries are
+    missing, raises RuntimeError with a helpful message. This avoids leaving a
+    stray DOT file named `plan.svg` when rendering fails.
     """
     if Digraph is None:
         raise RuntimeError("Python package 'graphviz' is required for SVG export")
+
     graph = Digraph(format="svg")
     for op in plan.get("ops", []):
         graph.node(op["id"], label=op["op"])
@@ -27,8 +30,11 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
         out_id = f"out:{out['as']}"
         graph.node(out_id, label=out['as'], shape="note")
         graph.edge(out["from"], out_id)
+
     try:
-        graph.render(filename, cleanup=True)
+        # Use pipe() to obtain SVG bytes directly so we only write the
+        # destination file on successful rendering.
+        svg_bytes = graph.pipe(format="svg")
     except Exception as e:  # pragma: no cover - depends on local system
         if ExecutableNotFound is not None and isinstance(e, ExecutableNotFound):
             raise RuntimeError(
@@ -36,4 +42,7 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
                 "or run without --svg."
             ) from e
         raise
+
+    with open(filename, "wb") as f:
+        f.write(svg_bytes)
     return filename

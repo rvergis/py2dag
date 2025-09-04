@@ -24,7 +24,9 @@ make setup         # create .venv and install deps (SVG extra by default)
 poetry install
 ```
 
-Note: HTML export via Dagre needs no system dependencies. Optional Graphviz SVG export requires the Graphviz system binaries (e.g., `brew install graphviz`).
+Notes:
+- HTML export uses Dagre via CDN (d3.js + dagre-d3). No local system deps, but an internet connection is required when opening `plan.html`. If you are offline or behind a firewall, the page will show a message; vendor the JS locally or open with internet access.
+- Optional Graphviz SVG export (`--svg`) requires Graphviz system binaries (e.g., `brew install graphviz`).
 
 ### Local Virtualenv (.venv)
 
@@ -54,6 +56,19 @@ poetry run python cli.py path/to/your_file.py --html
 ```
 
 This generates `plan.json`, `plan.pseudo`, and if `--html` is used, `plan.html`.
+
+### Offline HTML (no internet)
+
+`plan.html` references d3 and dagre-d3 from CDNs. To view graphs fully offline, download those files and place them next to `plan.html`, then edit the two `<script>` tags in `py2dag/export_dagre.py` to point at your local copies.
+
+Example (download once):
+
+```
+wget https://d3js.org/d3.v5.min.js -O d3.v5.min.js
+wget https://unpkg.com/dagre-d3@0.6.4/dist/dagre-d3.min.js -O dagre-d3.min.js
+```
+
+Then update the script tags to `./d3.v5.min.js` and `./dagre-d3.min.js` and regenerate `plan.html`.
 
 ## Tests
 

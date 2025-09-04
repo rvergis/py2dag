@@ -1,9 +1,9 @@
 import argparse
 import json
 
-import parser as dsl_parser
-import pseudo as pseudo_module
-import export_svg
+from . import parser as dsl_parser
+from . import pseudo as pseudo_module
+from . import export_svg
 
 
 def main() -> None:

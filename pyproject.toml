@@ -1,0 +1,27 @@
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "py2dag"
+version = "0.1.0"
+description = "Convert Python function plans to DAG (JSON, pseudo, optional SVG)."
+authors = ["rvergis"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+graphviz = { version = "^0.20.3", optional = true }
+
+[tool.poetry.extras]
+svg = ["graphviz"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[tool.poetry.scripts]
+py2dag = "py2dag.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

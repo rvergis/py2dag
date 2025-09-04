@@ -25,3 +25,4 @@ def generate(plan: Dict[str, Any]) -> str:
     for out in plan.get("outputs", []):
         lines.append(f"output({out['from']}, as={json.dumps(out['as'])})")
     return "\n".join(lines).rstrip() + "\n"
+

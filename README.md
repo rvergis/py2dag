@@ -3,13 +3,19 @@ Convert Python function plans to a DAG (JSON, pseudo, optional SVG).
 
 ## Install
 
-- With pip (editable):
+- From PyPI (once published):
+
+```
+pip install py2dag
+```
+
+- From a local checkout (editable):
 
 ```
 pip install -e .
 ```
 
-- With pip (wheel/sdist):
+- From a local checkout (wheel/sdist):
 
 ```
 pip install .
@@ -108,3 +114,29 @@ poetry run make test
 - `make test`: run tests with `-s` to show `print()` output
 - `make build`: build the package via Poetry
 - `make clean`: remove caches, build artifacts, and generated plan files
+
+## Releasing to PyPI
+
+This repo includes a GitHub Actions workflow that publishes to PyPI when you push a Git tag like `v0.1.1`.
+
+1) In GitHub repo settings, add a repository secret named `PYPI_API_TOKEN` with your PyPI token (format: `pypi-***`).
+
+2) Bump patch version, create tag, and push it (this triggers the workflow):
+
+```
+make release
+```
+
+Or do individual steps:
+
+```
+make bump-patch
+make tag
+make push-tags
+```
+
+You can also build locally:
+
+```
+make build
+```

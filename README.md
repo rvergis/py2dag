@@ -57,6 +57,8 @@ poetry run python cli.py path/to/your_file.py --html
 
 This generates `plan.json`, `plan.pseudo`, and if `--html` is used, `plan.html`.
 
+- Function name: By default the tool auto-detects a suitable function in the file. To target a specific function, pass `--func NAME`.
+
 ### Offline HTML (no internet)
 
 `plan.html` references d3 and dagre-d3 from CDNs. To view graphs fully offline, download those files and place them next to `plan.html`, then edit the two `<script>` tags in `py2dag/export_dagre.py` to point at your local copies.
@@ -92,18 +94,17 @@ This repo includes a GitHub Actions workflow that publishes to PyPI when you pus
 
 1) In GitHub repo settings, add a repository secret named `PYPI_API_TOKEN` with your PyPI token (format: `pypi-***`).
 
-2) Bump patch version, create tag, and push it (this triggers the workflow):
+2) Bump patch version, commit, and tag locally; then push tags to trigger the workflow:
 
 ```
-make release
+make patch        # bumps version, commits, and tags vX.Y.Z
+make release      # pushes tags to GitHub (triggers publish)
 ```
 
-Or do individual steps:
+Or push tags manually:
 
 ```
-make bump-patch
-make tag
-make push-tags
+git push --tags
 ```
 
 You can also install from the local build with `pip install dist/*.whl`.

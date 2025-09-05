@@ -1,4 +1,4 @@
-.PHONY: setup shell test run build clean version bump-patch tag push-tags release
+.PHONY: setup shell test run build clean version patch release
 .ONESHELL:
 
 # Tooling
@@ -40,15 +40,14 @@ clean:
 version:
 		@$(PYTHON) scripts/version_utils.py print
 
-bump-patch:
-		@$(PYTHON) scripts/version_utils.py bump
+patch:
+	@$(PYTHON) scripts/version_utils.py bump
+	@v=$$(make -s version); \
+	  git add pyproject.toml; \
+	  git commit -m "chore(release): v$$v"; \
+	  git tag v$$v; \
+	  echo "Bumped, committed, and tagged v$$v"
 
-tag:
-	@v=$$(make -s version); git tag v$$v
-	@echo Tagged v$$v
-
-push-tags:
+# release: push tags only (triggers GitHub Action to publish)
+release:
 	@git push --tags
-
-# release: bump patch, tag, and push tags (triggers GitHub Action to publish)
-release: tag push-tags

@@ -9,7 +9,7 @@ from . import export_svg
 def main() -> None:
     ap = argparse.ArgumentParser(description="Convert Python function plan to DAG")
     ap.add_argument("file", help="Python file containing the plan function")
-    ap.add_argument("--func", default="plan", help="Function name to parse")
+    ap.add_argument("--func", default=None, help="Function name to parse (auto-detect if omitted)")
     ap.add_argument("--svg", action="store_true", help="Also export plan.svg via Graphviz (requires dot)")
     ap.add_argument("--html", action="store_true", help="Also export plan.html via Dagre (no system deps)")
     args = ap.parse_args()

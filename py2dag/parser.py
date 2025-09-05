@@ -156,7 +156,9 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         if len(ops) > 200:
             raise DSLParseError("Too many operations")
 
-        plan: Dict[str, Any] = {"version": 1, "ops": ops, "outputs": outputs}
+        # Include the parsed function name for visibility/debugging
+        fn_name = getattr(fn, "name", None)  # type: ignore[attr-defined]
+        plan: Dict[str, Any] = {"version": 1, "function": fn_name, "ops": ops, "outputs": outputs}
         if settings:
             plan["settings"] = settings
         return plan

@@ -67,3 +67,31 @@ def plan():
 '''
     with pytest.raises(Exception):
         parse_src(code)
+
+
+def test_parses_non_standard_function_name_autodetect():
+    code = '''
+def my_flow():
+    a = AGENT.op()
+    output(a, as_="o.txt")
+'''
+    plan = parser.parse(code)
+    assert len(plan["ops"]) == 1
+    assert plan["ops"][0]["id"] == "a"
+    assert plan["outputs"][0]["as"] == "o.txt"
+    assert plan["function"] == "my_flow"
+
+
+def test_parses_async_non_standard_function_name_autodetect():
+    code = '''
+async def my_async_def_fn():
+    a = await AGENTX.op1()
+    b = await AGENTX.op2(a, k=2)
+    output(b, as_="out.txt")
+'''
+    plan = parser.parse(code)
+    assert len(plan["ops"]) == 2
+    assert plan["ops"][0]["id"] == "a"
+    assert plan["ops"][1]["id"] == "b"
+    assert plan["outputs"][0]["as"] == "out.txt"
+    assert plan["function"] == "my_async_def_fn"

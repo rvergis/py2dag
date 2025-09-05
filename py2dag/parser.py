@@ -47,11 +47,16 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         settings: Dict[str, Any] = {}
 
         returned_var: Optional[str] = None
-        # Treat function parameters as pre-defined names
+        # Enforce no-args top-level function signature
         try:
-            for arg in getattr(fn, "args").args:  # type: ignore[attr-defined]
-                defined.add(arg.arg)
-        except Exception:
+            fargs = getattr(fn, "args")  # type: ignore[attr-defined]
+            has_params = bool(
+                getattr(fargs, "posonlyargs", []) or fargs.args or fargs.vararg or fargs.kwonlyargs or fargs.kwarg
+            )
+            if has_params:
+                raise DSLParseError("Top-level function must not accept parameters")
+        except AttributeError:
+            # If args not present, ignore
             pass
 
         def _collect_name_deps(node: ast.AST) -> List[str]:

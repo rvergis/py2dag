@@ -373,7 +373,7 @@ async def fn1():
 
 def test_supports_kwargs_and_varargs_splats():
     code = '''
-def flow(p):
+def flow():
     base = AG.base()
     args = [base]
     kw = {"k": 1}
@@ -392,15 +392,14 @@ def flow(p):
     assert "AG.call3" in calls and "base" in calls["AG.call3"]["deps"]
 
 
-def test_function_params_are_treated_as_defined():
+def test_function_with_params_rejected():
     code = '''
 def flow(p):
     b = AG.op2(p)
     return b
 '''
-    plan = parser.parse(code)
-    assert plan["outputs"][0]["from"] == "b"
-    assert plan["ops"][0]["deps"] == ["p"]
+    with pytest.raises(Exception):
+        parser.parse(code)
 
 
 def test_list_comprehension_assignment_creates_comp_op():
@@ -546,3 +545,17 @@ def flow():
 '''
     with pytest.raises(Exception):
         parser.parse(code)
+
+
+def test_unusual_function_signatures_rejected():
+    cases = [
+        '''\ndef flow(a=1):\n    return 1\n''',
+        '''\ndef flow(*args):\n    return 1\n''',
+        '''\ndef flow(**kwargs):\n    return 1\n''',
+        '''\ndef flow(a, *, k):\n    return 1\n''',
+        '''\ndef flow(a, b=2, *, k=3, **kw):\n    return 1\n''',
+        '''\ndef flow(a: int):\n    return 1\n''',
+    ]
+    for code in cases:
+        with pytest.raises(Exception):
+            parser.parse(code)

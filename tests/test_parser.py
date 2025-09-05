@@ -130,11 +130,16 @@ async def flow():
         if not crossed:
             continue
         approx_time = await AG3.op(x)
+        data = await AG4.op(approx_time)
+        lat = data["sensor_lat"]
+        lon = data["sensor_lon"]
         AG4.proc(approx_time)
         crossing_info = {
             "approx_time": approx_time,
             "details": await AG5.op3(approx_time),
-            "item": x
+            "item": x,
+            "lat": lat,
+            "lon": lon,
         }
     return crossing_info
 '''

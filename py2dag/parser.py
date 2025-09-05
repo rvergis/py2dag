@@ -288,6 +288,26 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             })
             return ssa
 
+        def _emit_assign_from_subscript(var_name: str, node: ast.Subscript) -> str:
+            # Support name[key] where key is a JSON-serialisable literal
+            base = node.value
+            if not isinstance(base, ast.Name):
+                raise DSLParseError("Subscript base must be a variable name")
+            # Extract slice expression across Python versions
+            sl = getattr(node, 'slice', None)
+            # In Python >=3.9, slice is the actual node; before it may be ast.Index
+            if hasattr(ast, 'Index') and isinstance(sl, getattr(ast, 'Index')):  # type: ignore[attr-defined]
+                sl = sl.value  # type: ignore[assignment]
+            key = _literal(sl)  # may raise if not literal
+            ssa = _ssa_new(var_name)
+            ops.append({
+                "id": ssa,
+                "op": "GET.item",
+                "deps": [_ssa_get(base.id)],
+                "args": {"key": key},
+            })
+            return ssa
+
         def _emit_cond(node: ast.AST, kind: str = "if") -> str:
             expr = _stringify(node)
             deps = [_ssa_get(n) for n in _collect_value_deps(node)]
@@ -322,6 +342,8 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     return _emit_assign_from_literal_or_pack(var_name, value)
                 elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
                     return _emit_assign_from_comp(var_name, value)
+                elif isinstance(value, ast.Subscript):
+                    return _emit_assign_from_subscript(var_name, value)
                 else:
                     raise DSLParseError("Right hand side must be a call or f-string")
             elif isinstance(stmt, ast.Expr):

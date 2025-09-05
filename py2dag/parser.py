@@ -101,6 +101,15 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "deps": deps,
                         "args": {"template": template},
                     })
+                elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
+                    # Allow assigning JSON-serialisable literals directly
+                    lit = _literal(value)
+                    ops.append({
+                        "id": var_name,
+                        "op": "CONST.value",
+                        "deps": [],
+                        "args": {"value": lit},
+                    })
                 else:
                     raise DSLParseError("Right hand side must be a call or f-string")
                 defined.add(var_name)
@@ -144,9 +153,9 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     if var not in defined:
                         raise DSLParseError(f"Undefined return variable: {var}")
                     returned_var = var
-                elif isinstance(stmt.value, ast.Constant):
-                    # Support returning a literal (e.g., "DONE"): synthesize a const op
-                    lit = stmt.value.value
+                elif isinstance(stmt.value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
+                    # Support returning a JSON-serialisable literal (str/num/bool/None, list/tuple, dict)
+                    lit = _literal(stmt.value)
                     const_id_base = "return_value"
                     const_id = const_id_base
                     n = 1

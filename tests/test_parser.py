@@ -60,6 +60,51 @@ def plan():
         parse_src(code)
 
 
+def test_rejects_for_loop_even_with_return():
+    code = '''
+def plan():
+    a = AGENT.op()
+    for i in [1, 2, 3]:
+        a = AGENT.op2(a)
+        if i == 2:
+            break
+    return a
+'''
+    with pytest.raises(Exception):
+        parse_src(code)
+
+
+def test_rejects_async_with_for_loops_and_return():
+    code = '''
+async def flow_with_loop():
+    a = await TOOL1.op1()
+    for i in [1, 2, 3]:
+        a = await TOOL1.op2(a)
+        if i == 1:
+            break
+    return a
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)
+
+
+def test_return_dict_literal_synthesizes_const_node():
+    code = '''
+def flow_returns_dict():
+    a = AGENT.op()
+    result = f"ok {a}"
+    return {"status": "ok", "value": [1, 2, 3]}
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow_returns_dict"
+    # Last op should be the synthesized const op with the dict literal
+    last = plan["ops"][-1]
+    assert last["op"] == "CONST.value"
+    assert last["args"]["value"] == {"status": "ok", "value": [1, 2, 3]}
+    assert plan["outputs"][0]["from"] == last["id"]
+    assert plan["outputs"][0]["as"] == "return"
+
+
 def test_requires_output():
     code = '''
 def plan():
@@ -161,4 +206,44 @@ async def flow_async_with_comments():
     assert last["args"]["value"] == "DONE"
     # Outputs should point to that synthesized node with alias 'return'
     assert plan["outputs"][0]["from"] == last["id"]
+    assert plan["outputs"][0]["as"] == "return"
+
+
+def test_describe_scene_sample_parses_correctly():
+    code = '''
+async def describe_scene_at_50_seconds():
+    frame_id = await AGENTYOLO.convert_elapsed_time_to_frame_id(seconds=50.0)
+    summary_text = await AGENTLLAVA.summarize_video_at_elapsed_time(et=50)
+    approx_coords = await AGENTKLVR.get_approximate_lat_lon_at_elapsed_time(et=50)
+    lat = await AGENTKLVR.get_lat(approx_coords)
+    lon = await AGENTKLVR.get_lon(approx_coords)
+    freeway_name = await AGENTROADY.get_freeway_details_after_elapsed_time(et=50)
+    lane_count = await AGENTROADY.get_number_of_lanes_after_elapsed_time(et=50)
+    final_summary = f"At 50 seconds into the video, {summary_text} " \
+                    f"The vehicle is at coordinates {lat}, {lon} on the {freeway_name}. " \
+                    f"There are {lane_count} lanes."
+    return final_summary
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "describe_scene_at_50_seconds"
+    assert len(plan["ops"]) == 8
+    assert any(op["id"] == "final_summary" and op["op"] == "TEXT.format" for op in plan["ops"])  # type: ignore[index]
+    assert plan["outputs"][0]["from"] == "final_summary"
+    assert plan["outputs"][0]["as"] == "return"
+
+
+def test_generator_pycode():
+    code = '''
+async def fn1():
+    crossing_info = {
+        "k1": "v1",
+        "k2": "v2",
+        "k3": "v3"
+    }
+    return crossing_info
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "fn1"
+    assert any(op["id"] == "crossing_info" and op["op"] == "CONST.value" for op in plan["ops"])  # type: ignore[index]
+    assert plan["outputs"][0]["from"] == "crossing_info"
     assert plan["outputs"][0]["as"] == "return"

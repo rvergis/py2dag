@@ -48,6 +48,7 @@ patch:
 	  git tag v$$v; \
 	  echo "Bumped, committed, and tagged v$$v"
 
-# release: push tags only (triggers GitHub Action to publish)
+# release: push commits and tags (triggers GitHub Action to publish)
 release:
+	@git push
 	@git push --tags

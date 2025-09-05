@@ -98,7 +98,7 @@ This repo includes a GitHub Actions workflow that publishes to PyPI when you pus
 
 ```
 make patch        # bumps version, commits, and tags vX.Y.Z
-make release      # pushes tags to GitHub (triggers publish)
+make release      # pushes commits and tags to GitHub (triggers publish)
 ```
 
 Or push tags manually:

@@ -84,6 +84,9 @@ def my_flow():
 
 def test_parses_async_non_standard_function_name_autodetect():
     code = '''
+# comment line 1
+# comment line 2
+# comment line 3
 async def my_async_def_fn():
     a = await AGENTX.op1()
     b = await AGENTX.op2(a, k=2)
@@ -95,3 +98,18 @@ async def my_async_def_fn():
     assert plan["ops"][1]["id"] == "b"
     assert plan["outputs"][0]["as"] == "out.txt"
     assert plan["function"] == "my_async_def_fn"
+
+
+def test_parses_when_comments_precede_function():
+    code = '''
+# leading comment line 1
+# leading comment line 2
+def flow_with_comments():
+    a = AGENT.op()
+    output(a, as_="o2.txt")
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow_with_comments"
+    assert len(plan["ops"]) == 1
+    assert plan["ops"][0]["id"] == "a"
+    assert plan["outputs"][0]["as"] == "o2.txt"

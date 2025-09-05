@@ -139,12 +139,29 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             elif isinstance(stmt, ast.Return):
                 if i != len(fn.body) - 1:  # type: ignore[index]
                     raise DSLParseError("return must be the last statement")
-                if not isinstance(stmt.value, ast.Name):
-                    raise DSLParseError("return must return a variable name")
-                var = stmt.value.id
-                if var not in defined:
-                    raise DSLParseError(f"Undefined return variable: {var}")
-                returned_var = var
+                if isinstance(stmt.value, ast.Name):
+                    var = stmt.value.id
+                    if var not in defined:
+                        raise DSLParseError(f"Undefined return variable: {var}")
+                    returned_var = var
+                elif isinstance(stmt.value, ast.Constant):
+                    # Support returning a literal (e.g., "DONE"): synthesize a const op
+                    lit = stmt.value.value
+                    const_id_base = "return_value"
+                    const_id = const_id_base
+                    n = 1
+                    while const_id in defined:
+                        const_id = f"{const_id_base}_{n}"
+                        n += 1
+                    ops.append({
+                        "id": const_id,
+                        "op": "CONST.value",
+                        "deps": [],
+                        "args": {"value": lit},
+                    })
+                    returned_var = const_id
+                else:
+                    raise DSLParseError("return must return a variable name or literal")
             else:
                 raise DSLParseError("Only assignments, expression calls, and a final return are allowed in function body")
 

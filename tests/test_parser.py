@@ -285,13 +285,13 @@ async def fn1():
     # Step 1
     a = await TOOL1.op1()
     # Step 2
-    b = await TOOL2.op2(a)
+    b = await TOOL2.op2(param1=a)
     # Step 3
-    c = await TOOL3.op3(b)
+    c = await TOOL3.op3(param1=b)
     crossing_info = None
     for i in range(0, 10):
         # Step 4
-        d = await TOOL4.op4(c)
+        d = await TOOL4.op4(param1=c, param2=i)
         if not d:
             continue
         v1 = d.get("k1")

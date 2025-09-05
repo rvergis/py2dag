@@ -76,7 +76,14 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     for kw in value.keywords:
                         if kw.arg is None:
                             raise DSLParseError("**kwargs are not allowed")
-                        kwargs[kw.arg] = _literal(kw.value)
+                        # Support variable-name keyword args as dependencies; literals remain in args
+                        if isinstance(kw.value, ast.Name):
+                            name = kw.value.id
+                            if name not in defined:
+                                raise DSLParseError(f"Undefined dependency: {name}")
+                            deps.append(name)
+                        else:
+                            kwargs[kw.arg] = _literal(kw.value)
 
                     ops.append({"id": var_name, "op": op_name, "deps": deps, "args": kwargs})
                 elif isinstance(value, ast.JoinedStr):

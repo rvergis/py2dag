@@ -66,11 +66,19 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
 
                     deps: List[str] = []
                     for arg in value.args:
-                        if not isinstance(arg, ast.Name):
-                            raise DSLParseError("Positional args must be variable names")
-                        if arg.id not in defined:
-                            raise DSLParseError(f"Undefined dependency: {arg.id}")
-                        deps.append(arg.id)
+                        if isinstance(arg, ast.Name):
+                            if arg.id not in defined:
+                                raise DSLParseError(f"Undefined dependency: {arg.id}")
+                            deps.append(arg.id)
+                        elif isinstance(arg, (ast.List, ast.Tuple)):
+                            for elt in arg.elts:
+                                if not isinstance(elt, ast.Name):
+                                    raise DSLParseError("List/Tuple positional args must be variable names")
+                                if elt.id not in defined:
+                                    raise DSLParseError(f"Undefined dependency: {elt.id}")
+                                deps.append(elt.id)
+                        else:
+                            raise DSLParseError("Positional args must be variable names or lists/tuples of names")
 
                     kwargs: Dict[str, Any] = {}
                     for kw in value.keywords:

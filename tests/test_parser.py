@@ -296,17 +296,28 @@ async def fn1():
             continue
         v1 = d.get("k1")
         v2 = d.get("k2")
-        v3 = d.get("k3")
+        e = await TOOL5.op5(d)
+        v3 = e["k3"]
         crossing_info = {
             "k1": v1,
             "k2": v2,
-            "k3": v3
+            "k3": v3,
+            "k4": await TOOL5.op5(d)
         }
         break
+    if crossing_info is None:
+        return { "status": "UNABLE_TO_PARSE", "reason": "No crossing information found" }
     return crossing_info
 '''
     plan = parser.parse(code)
     assert plan["function"] == "fn1"
+    # Ensure the first three linear ops are parsed in order
+    assert [op["op"] for op in plan["ops"]][:3] == [
+        "TOOL1.op1",
+        "TOOL2.op2",
+        "TOOL3.op3",
+    ]
+    assert [op["id"] for op in plan["ops"]][:3] == ["a", "b", "c"]
     assert any(op["id"] == "crossing_info" and op["op"] == "CONST.value" for op in plan["ops"])  # type: ignore[index]
     assert plan["outputs"][0]["from"] == "crossing_info"
     assert plan["outputs"][0]["as"] == "return"

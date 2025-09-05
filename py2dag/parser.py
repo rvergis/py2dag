@@ -252,11 +252,14 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             ops.append({"id": ssa, "op": "COND.eval", "deps": deps, "args": {"expr": expr, "kind": kind}})
             return ssa
 
-        def _emit_iter(node: ast.AST) -> str:
+        def _emit_iter(node: ast.AST, target_label: Optional[str] = None) -> str:
             expr = _stringify(node)
             deps = [_ssa_get(n) for n in _collect_value_deps(node)]
             ssa = _ssa_new("iter")
-            ops.append({"id": ssa, "op": "ITER.eval", "deps": deps, "args": {"expr": expr, "kind": "for"}})
+            args = {"expr": expr, "kind": "for"}
+            if target_label:
+                args["target"] = target_label
+            ops.append({"id": ssa, "op": "ITER.eval", "deps": deps, "args": args})
             return ssa
 
         def _parse_stmt(stmt: ast.stmt) -> Optional[str]:
@@ -383,7 +386,19 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 return None
             elif isinstance(stmt, (ast.For, ast.AsyncFor)):
                 # ITER over iterable
-                iter_id = _emit_iter(stmt.iter)
+                # Determine loop target label if simple
+                t = stmt.target
+                t_label: Optional[str] = None
+                if isinstance(t, ast.Name):
+                    t_label = t.id
+                elif isinstance(t, ast.Tuple) and all(isinstance(e, ast.Name) for e in t.elts):
+                    t_label = ",".join(e.id for e in t.elts)  # type: ignore[attr-defined]
+                else:
+                    try:
+                        t_label = ast.unparse(t)  # type: ignore[attr-defined]
+                    except Exception:
+                        t_label = None
+                iter_id = _emit_iter(stmt.iter, target_label=t_label)
                 # Save pre-loop state
                 pre_versions = dict(versions)
                 pre_latest = dict(latest)

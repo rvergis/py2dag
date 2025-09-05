@@ -73,10 +73,21 @@ HTML_TEMPLATE = """<!doctype html>
           g.setEdge(out.from, outId);
         });
 
-        // Add dependency edges between ops
+        // Build index for source op lookup
+        const opById = {};
+        (plan.ops || []).forEach(op => { opById[op.id] = op; });
+
+        // Add dependency edges between ops with labels
         (plan.ops || []).forEach(op => {
           (op.deps || []).forEach(dep => {
-            g.setEdge(dep, op.id);
+            const src = opById[dep];
+            let edgeLabel = dep; // default to SSA id
+            if (src && src.op === 'COND.eval') {
+              edgeLabel = 'cond';
+            } else if (src && src.op === 'ITER.eval') {
+              edgeLabel = (src.args && src.args.target) ? src.args.target : 'iter';
+            }
+            g.setEdge(dep, op.id, { label: edgeLabel });
           });
         });
 

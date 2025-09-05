@@ -369,3 +369,180 @@ async def fn1():
     assert any(op["id"] == "crossing_info" and op["op"] == "CONST.value" for op in plan["ops"])  # type: ignore[index]
     assert plan["outputs"][0]["from"] == "crossing_info"
     assert plan["outputs"][0]["as"] == "return"
+
+
+def test_supports_kwargs_and_varargs_splats():
+    code = '''
+def flow(p):
+    base = AG.base()
+    args = [base]
+    kw = {"k": 1}
+    x = AG.call(*args, **kw)
+    y = AG.call2(*args, k=base)
+    z = AG.call3(base, *[base])
+    return z
+'''
+    plan = parser.parse(code)
+    ids = [op["id"] for op in plan["ops"]]
+    assert ids[:1] == ["base"]
+    # Ensure calls are present and depend on base
+    calls = {op["op"]: op for op in plan["ops"] if op["op"].startswith("AG.")}
+    assert "AG.call" in calls and "base" in calls["AG.call"]["deps"]
+    assert "AG.call2" in calls and "base" in calls["AG.call2"]["deps"]
+    assert "AG.call3" in calls and "base" in calls["AG.call3"]["deps"]
+
+
+def test_function_params_are_treated_as_defined():
+    code = '''
+def flow(p):
+    b = AG.op2(p)
+    return b
+'''
+    plan = parser.parse(code)
+    assert plan["outputs"][0]["from"] == "b"
+    assert plan["ops"][0]["deps"] == ["p"]
+
+
+def test_list_comprehension_assignment_creates_comp_op():
+    code = '''
+def flow():
+    a = AG.src()
+    xs = [v for v in a]
+    return a
+'''
+    plan = parser.parse(code)
+    comp = next(op for op in plan["ops"] if op["id"] == "xs")
+    assert comp["op"].startswith("COMP.")
+    assert "a" in comp["deps"]
+
+
+def test_keyword_args_mixed_dependencies_and_literals():
+    code = '''
+def flow():
+    a = AG.op1()
+    b = AG.op2(a, k1=1, k2="x")
+    c = AG.op3(param=a, other=2)
+    return c
+'''
+    plan = parser.parse(code)
+    ops = {op["id"]: op for op in plan["ops"]}
+    assert ops["b"]["deps"] == ["a"]
+    assert ops["b"]["args"] == {"k1": 1, "k2": "x"}
+    assert ops["c"]["deps"] == ["a"]
+    assert ops["c"]["args"] == {"other": 2}
+    assert plan["outputs"][0]["from"] == "c"
+
+
+def test_positional_list_and_tuple_dependencies():
+    code = '''
+def flow():
+    a = AG.op()
+    b = AG.op2([a, a])
+    c = AG.op3((a,))
+    return c
+'''
+    plan = parser.parse(code)
+    assert [op["deps"] for op in plan["ops"] if op["id"] in {"b", "c"}] == [["a", "a"], ["a"]]
+
+
+def test_settings_and_output_still_supported():
+    code = '''
+def flow():
+    settings(timeout=30, mode="fast")
+    a = AG.op()
+    output(a, as_="o.txt")
+'''
+    plan = parser.parse(code)
+    assert plan.get("settings") == {"timeout": 30, "mode": "fast"}
+    assert plan["outputs"][0] == {"from": "a", "as": "o.txt"}
+
+
+def test_duplicate_variable_rejected():
+    code = '''
+def flow():
+    a = AG.op()
+    a = AG.op()
+    return a
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)
+
+
+def test_invalid_variable_name_rejected():
+    code = '''
+def flow():
+    Bad = AG.op()
+    return Bad
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)
+
+
+def test_return_list_literal_synthesizes_const():
+    code = '''
+def flow():
+    a = AG.op()
+    return [1, 2, 3]
+'''
+    plan = parser.parse(code)
+    last = plan["ops"][-1]
+    assert last["op"] == "CONST.value"
+    assert last["args"]["value"] == [1, 2, 3]
+    assert plan["outputs"][0]["from"] == last["id"]
+
+
+def test_attribute_argument_rejected():
+    code = '''
+def flow():
+    a = OBJ.attr
+    b = AG.op(a.attr)
+    return b
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)
+
+
+def test_return_must_be_last_statement():
+    code = '''
+def flow():
+    a = AG.op()
+    return a
+    b = AG.op2(a)
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)
+
+
+def test_autodetect_skips_invalid_and_uses_valid_function():
+    code = '''
+def bad():
+    import os
+
+def good():
+    a = AG.op()
+    return a
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "good"
+    assert plan["outputs"][0]["from"] == "a"
+
+
+def test_explicit_function_name_not_found():
+    code = '''
+def f():
+    a = AG.op()
+    return a
+'''
+    with pytest.raises(Exception):
+        parser.parse(code, function_name="missing")
+
+
+def test_settings_requires_keyword_literals_only():
+    code = '''
+def flow():
+    x = AG.op()
+    settings(timeout=x)
+    return x
+'''
+    with pytest.raises(Exception):
+        parser.parse(code)

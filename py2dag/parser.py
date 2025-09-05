@@ -47,6 +47,20 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         settings: Dict[str, Any] = {}
 
         returned_var: Optional[str] = None
+        # Treat function parameters as pre-defined names
+        try:
+            for arg in getattr(fn, "args").args:  # type: ignore[attr-defined]
+                defined.add(arg.arg)
+        except Exception:
+            pass
+
+        def _collect_name_deps(node: ast.AST) -> List[str]:
+            names: List[str] = []
+            for n in ast.walk(node):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+                    if n.id not in names:
+                        names.append(n.id)
+            return names
         # type: ignore[attr-defined]
         for i, stmt in enumerate(fn.body):  # type: ignore[attr-defined]
             if isinstance(stmt, ast.Assign):
@@ -65,8 +79,32 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     op_name = _get_call_name(value.func)
 
                     deps: List[str] = []
+
+                    def _expand_star_name(varname: str) -> List[str]:
+                        # Try to expand a previously packed list/tuple variable into its element deps
+                        for prev in reversed(ops):
+                            if prev.get("id") == varname:
+                                if prev.get("op") in {"PACK.list", "PACK.tuple"}:
+                                    return list(prev.get("deps", []))
+                                break
+                        return [varname]
                     for arg in value.args:
-                        if isinstance(arg, ast.Name):
+                        if isinstance(arg, ast.Starred):
+                            star_val = arg.value
+                            if isinstance(star_val, ast.Name):
+                                if star_val.id not in defined:
+                                    raise DSLParseError(f"Undefined dependency: {star_val.id}")
+                                deps.extend(_expand_star_name(star_val.id))
+                            elif isinstance(star_val, (ast.List, ast.Tuple)):
+                                for elt in star_val.elts:
+                                    if not isinstance(elt, ast.Name):
+                                        raise DSLParseError("Starred list/tuple elements must be names")
+                                    if elt.id not in defined:
+                                        raise DSLParseError(f"Undefined dependency: {elt.id}")
+                                    deps.append(elt.id)
+                            else:
+                                raise DSLParseError("*args must be a name or list/tuple of names")
+                        elif isinstance(arg, ast.Name):
                             if arg.id not in defined:
                                 raise DSLParseError(f"Undefined dependency: {arg.id}")
                             deps.append(arg.id)
@@ -83,15 +121,28 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     kwargs: Dict[str, Any] = {}
                     for kw in value.keywords:
                         if kw.arg is None:
-                            raise DSLParseError("**kwargs are not allowed")
-                        # Support variable-name keyword args as dependencies; literals remain in args
-                        if isinstance(kw.value, ast.Name):
-                            name = kw.value.id
-                            if name not in defined:
-                                raise DSLParseError(f"Undefined dependency: {name}")
-                            deps.append(name)
+                            # **kwargs support: allow dict literal merge, or variable name as dep
+                            v = kw.value
+                            if isinstance(v, ast.Dict):
+                                # Merge literal kwargs
+                                lit = _literal(v)
+                                for k, val in lit.items():
+                                    kwargs[str(k)] = val
+                            elif isinstance(v, ast.Name):
+                                if v.id not in defined:
+                                    raise DSLParseError(f"Undefined dependency: {v.id}")
+                                deps.append(v.id)
+                            else:
+                                raise DSLParseError("**kwargs must be a dict literal or a variable name")
                         else:
-                            kwargs[kw.arg] = _literal(kw.value)
+                            # Support variable-name keyword args as dependencies; literals remain in args
+                            if isinstance(kw.value, ast.Name):
+                                name = kw.value.id
+                                if name not in defined:
+                                    raise DSLParseError(f"Undefined dependency: {name}")
+                                deps.append(name)
+                            else:
+                                kwargs[kw.arg] = _literal(kw.value)
 
                     ops.append({"id": var_name, "op": op_name, "deps": deps, "args": kwargs})
                 elif isinstance(value, ast.JoinedStr):
@@ -117,13 +168,52 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "args": {"template": template},
                     })
                 elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
-                    # Allow assigning JSON-serialisable literals directly
-                    lit = _literal(value)
+                    # Allow assigning literals; also support packing lists/tuples of names
+                    try:
+                        lit = _literal(value)
+                        ops.append({
+                            "id": var_name,
+                            "op": "CONST.value",
+                            "deps": [],
+                            "args": {"value": lit},
+                        })
+                    except DSLParseError:
+                        if isinstance(value, (ast.List, ast.Tuple)):
+                            elts = value.elts
+                            names: List[str] = []
+                            for elt in elts:
+                                if not isinstance(elt, ast.Name):
+                                    raise DSLParseError("Only names allowed in non-literal list/tuple assignment")
+                                if elt.id not in defined:
+                                    raise DSLParseError(f"Undefined dependency: {elt.id}")
+                                names.append(elt.id)
+                            kind = "list" if isinstance(value, ast.List) else "tuple"
+                            ops.append({
+                                "id": var_name,
+                                "op": f"PACK.{kind}",
+                                "deps": names,
+                                "args": {},
+                            })
+                        else:
+                            raise
+                elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                    # Basic comprehension support: collect name deps and emit a generic comp op
+                    name_deps = [n for n in _collect_name_deps(value) if n in defined]
+                    # Ensure no undefined names used
+                    for n in name_deps:
+                        if n not in defined:
+                            raise DSLParseError(f"Undefined dependency: {n}")
+                    kind = (
+                        "listcomp" if isinstance(value, ast.ListComp) else
+                        "setcomp" if isinstance(value, ast.SetComp) else
+                        "dictcomp" if isinstance(value, ast.DictComp) else
+                        "genexpr"
+                    )
                     ops.append({
                         "id": var_name,
-                        "op": "CONST.value",
-                        "deps": [],
-                        "args": {"value": lit},
+                        "op": f"COMP.{kind}",
+                        "deps": name_deps,
+                        "args": {},
                     })
                 else:
                     raise DSLParseError("Right hand side must be a call or f-string")
@@ -186,7 +276,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     returned_var = const_id
                 else:
                     raise DSLParseError("return must return a variable name or literal")
-            elif isinstance(stmt, (ast.For, ast.AsyncFor, ast.While, ast.If)):
+            elif isinstance(stmt, (ast.For, ast.AsyncFor, ast.While, ast.If, ast.Match)):
                 # Ignore control flow blocks; only top-level linear statements are modeled
                 continue
             elif isinstance(stmt, (ast.Pass,)):

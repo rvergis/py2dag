@@ -1,4 +1,4 @@
-.PHONY: setup shell test run build clean version patch release
+.PHONY: setup shell test run build clean version patch minor release
 .ONESHELL:
 
 # Tooling
@@ -47,6 +47,14 @@ patch:
 	  git commit -m "chore(release): v$$v"; \
 	  git tag v$$v; \
 	  echo "Bumped, committed, and tagged v$$v"
+
+minor:
+	@$(PYTHON) scripts/version_utils.py minor
+	@v=$$(make -s version); \
+	  git add pyproject.toml; \
+	  git commit -m "chore(release): v$$v"; \
+	  git tag v$$v; \
+	  echo "Bumped minor, committed, and tagged v$$v"
 
 # release: push commits and tags (triggers GitHub Action to publish)
 release:

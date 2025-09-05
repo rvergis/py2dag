@@ -17,9 +17,16 @@ def bump_patch(version: str) -> str:
     return f"{major}.{minor}.{patch}"
 
 
+def bump_minor(version: str) -> str:
+    major, minor, patch = map(int, version.split("."))
+    minor += 1
+    patch = 0
+    return f"{major}.{minor}.{patch}"
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) < 2 or argv[1] not in {"print", "bump"}:
-        print("Usage: python scripts/version_utils.py [print|bump]", file=sys.stderr)
+    if len(argv) < 2 or argv[1] not in {"print", "bump", "minor"}:
+        print("Usage: python scripts/version_utils.py [print|bump|minor]", file=sys.stderr)
         return 2
 
     text = PYPROJECT.read_text(encoding="utf-8")
@@ -29,8 +36,11 @@ def main(argv: list[str]) -> int:
         print(current)
         return 0
 
-    # bump
-    new_version = bump_patch(current)
+    # bump patch by default (back-compat)
+    if argv[1] == "bump":
+        new_version = bump_patch(current)
+    else:  # minor
+        new_version = bump_minor(current)
     new_text = re.sub(
         r"(?m)^version\s*=\s*\"(\d+\.\d+\.\d+)\"",
         f'version = "{new_version}"',

@@ -48,9 +48,22 @@ HTML_TEMPLATE = """<!doctype html>
         // Ensure edges have an object for labels/attrs to avoid TypeErrors
         g.setDefaultEdgeLabel(() => ({}));
 
-        // Add op nodes
+        // Add op nodes with basic styling for control nodes
         (plan.ops || []).forEach(op => {
-          g.setNode(op.id, { label: op.op, class: 'op', padding: 8 });
+          let label = op.op;
+          let klass = 'op';
+          if (op.op === 'COND.eval') {
+            const kind = (op.args && op.args.kind) || 'if';
+            label = (kind.toUpperCase()) + ' ' + (op.args && op.args.expr ? op.args.expr : '');
+            klass = 'note';
+          } else if (op.op === 'ITER.eval') {
+            label = 'FOR ' + (op.args && op.args.expr ? op.args.expr : '');
+            klass = 'note';
+          } else if (op.op === 'PHI') {
+            label = 'PHI' + (op.args && op.args.var ? ` (${op.args.var})` : '');
+            klass = 'note';
+          }
+          g.setNode(op.id, { label, class: klass, padding: 8 });
         });
 
         // Add output nodes and edges from source to output

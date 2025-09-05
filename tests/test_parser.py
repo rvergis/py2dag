@@ -60,7 +60,7 @@ def plan():
         parse_src(code)
 
 
-def test_rejects_for_loop_even_with_return():
+def test_ignores_for_loop_and_parses_return():
     code = '''
 def plan():
     a = AGENT.op()
@@ -70,11 +70,14 @@ def plan():
             break
     return a
 '''
-    with pytest.raises(Exception):
-        parse_src(code)
+    plan = parse_src(code)
+    # Loop is ignored; only the initial assignment is captured
+    assert [op["id"] for op in plan["ops"]] == ["a"]
+    assert plan["outputs"][0]["from"] == "a"
+    assert plan["outputs"][0]["as"] == "return"
 
 
-def test_rejects_async_with_for_loops_and_return():
+def test_ignores_async_for_loop_and_parses_return():
     code = '''
 async def flow_with_loop():
     a = await TOOL1.op1()
@@ -84,8 +87,10 @@ async def flow_with_loop():
             break
     return a
 '''
-    with pytest.raises(Exception):
-        parser.parse(code)
+    plan = parser.parse(code)
+    assert [op["id"] for op in plan["ops"]] == ["a"]
+    assert plan["outputs"][0]["from"] == "a"
+    assert plan["outputs"][0]["as"] == "return"
 
 
 def test_return_dict_literal_synthesizes_const_node():
@@ -102,6 +107,44 @@ def flow_returns_dict():
     assert last["op"] == "CONST.value"
     assert last["args"]["value"] == {"status": "ok", "value": [1, 2, 3]}
     assert plan["outputs"][0]["from"] == last["id"]
+    assert plan["outputs"][0]["as"] == "return"
+
+
+def test_generator_pycode():
+    code = '''
+# comment line 1
+# comment line 2
+# comment line 3
+
+async def fn1():
+    # Step 1
+    a = await TOOL1.op1()
+    # Step 2
+    b = await TOOL2.op2(a)
+    # Step 3
+    c = await TOOL3.op3(b)
+    crossing_info = None
+    for i in range(0, 10):
+        # Step 4
+        d = await TOOL4.op4(c)
+        if not d:
+            continue
+        v1 = d.get("k1")
+        v2 = d.get("k2")
+        v3 = d.get("k3")
+        crossing_info = {
+            "k1": v1,
+            "k2": v2,
+            "k3": v3
+        }
+        break
+    return crossing_info
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "fn1"
+    # Loops are ignored; crossing_info remains the initial None assignment
+    assert any(op["id"] == "crossing_info" and op["op"] == "CONST.value" for op in plan["ops"])  # type: ignore[index]
+    assert plan["outputs"][0]["from"] == "crossing_info"
     assert plan["outputs"][0]["as"] == "return"
 
 
@@ -234,12 +277,32 @@ async def describe_scene_at_50_seconds():
 
 def test_generator_pycode():
     code = '''
+# comment line 1
+# comment line 2
+# comment line 3
+
 async def fn1():
-    crossing_info = {
-        "k1": "v1",
-        "k2": "v2",
-        "k3": "v3"
-    }
+    # Step 1
+    a = await TOOL1.op1()
+    # Step 2
+    b = await TOOL2.op2(a)
+    # Step 3
+    c = await TOOL3.op3(b)
+    crossing_info = None
+    for i in range(0, 10):
+        # Step 4
+        d = await TOOL4.op4(c)
+        if not d:
+            continue
+        v1 = d.get("k1")
+        v2 = d.get("k2")
+        v3 = d.get("k3")
+        crossing_info = {
+            "k1": v1,
+            "k2": v2,
+            "k3": v3
+        }
+        break
     return crossing_info
 '''
     plan = parser.parse(code)

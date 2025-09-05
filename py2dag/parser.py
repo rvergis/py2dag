@@ -171,6 +171,9 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     returned_var = const_id
                 else:
                     raise DSLParseError("return must return a variable name or literal")
+            elif isinstance(stmt, (ast.For, ast.AsyncFor, ast.While)):
+                # Ignore control flow blocks; only top-level linear statements are modeled
+                continue
             else:
                 raise DSLParseError("Only assignments, expression calls, and a final return are allowed in function body")
 

@@ -113,3 +113,24 @@ def flow_with_comments():
     assert len(plan["ops"]) == 1
     assert plan["ops"][0]["id"] == "a"
     assert plan["outputs"][0]["as"] == "o2.txt"
+
+
+def test_parses_async_with_comments_and_awaits():
+    code = '''
+# file-level comment A
+# file-level comment B
+
+async def flow_async_with_comments():
+    # inside comment before first op
+    a = await TOOL1.op1()
+    # comment between ops
+    b = await TOOL2.op2(a, k=3)
+    # final comment before output
+    output(b, as_="out_async.txt")
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow_async_with_comments"
+    assert [op["id"] for op in plan["ops"]] == ["a", "b"]
+    assert plan["ops"][0]["op"] == "TOOL1.op1"
+    assert plan["ops"][1]["op"] == "TOOL2.op2"
+    assert plan["outputs"][0]["as"] == "out_async.txt"

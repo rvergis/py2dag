@@ -117,3 +117,28 @@ def flow():
     comp = next(op for op in plan["ops"] if op["op"].startswith("COMP."))
     assert len(comp["deps"]) == 1
 
+
+def test_for_each():
+    code = '''
+async def flow():
+    a = AG1.src()
+    xs = await AG1.op(param1=a, param2=42)
+    crossing_info = None
+    for x in xs:
+        AG3.proc(x)
+        crossed = await AG4.op2(x)
+        if not crossed:
+            continue
+        approx_time = await AG3.op(x)
+        AG4.proc(approx_time)
+        crossing_info = {
+            "approx_time": approx_time,
+            "details": await AG5.op3(approx_time),
+            "item": x
+        }
+    return crossing_info
+'''
+    plan = parser.parse(code)
+    comp = next(op for op in plan["ops"] if op["op"].startswith("COMP."))
+    assert len(comp["deps"]) == 1
+

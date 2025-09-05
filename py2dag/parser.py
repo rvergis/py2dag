@@ -173,6 +173,10 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             ops.append({"id": ssa, "op": op_name, "deps": deps, "args": kwargs})
             return ssa
 
+        def _emit_expr_call(call: ast.Call) -> str:
+            """Emit a node for a bare expression call (no assignment)."""
+            return _emit_assign_from_call("call", call)
+
         def _emit_assign_from_fstring(var_name: str, fstr: ast.JoinedStr) -> str:
             deps: List[str] = []
             parts: List[str] = []
@@ -220,6 +224,45 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "op": f"PACK.{kind}",
                         "deps": deps,
                         "args": {},
+                    })
+                    return ssa
+                if isinstance(value, ast.Dict):
+                    # Support dict with values from names/calls or literals by synthesizing nodes
+                    keys: List[str] = []
+                    deps: List[str] = []
+                    for k_node, v_node in zip(value.keys, value.values):
+                        k_str = _literal(k_node)
+                        if not isinstance(k_str, (str, int, float, bool)):
+                            k_str = str(k_str)
+                        keys.append(str(k_str))
+                        if isinstance(v_node, ast.Name):
+                            deps.append(_ssa_get(v_node.id))
+                        elif isinstance(v_node, ast.Await):
+                            inner = v_node.value
+                            if not isinstance(inner, ast.Call):
+                                raise DSLParseError("await must wrap a call in dict value")
+                            tmp_id = _emit_assign_from_call(f"{var_name}_field", inner)
+                            deps.append(tmp_id)
+                        elif isinstance(v_node, ast.Call):
+                            tmp_id = _emit_assign_from_call(f"{var_name}_field", v_node)
+                            deps.append(tmp_id)
+                        else:
+                            # Synthesize const for literal value
+                            lit_val = _literal(v_node)
+                            tmp = _ssa_new(f"{var_name}_lit")
+                            ops.append({
+                                "id": tmp,
+                                "op": "CONST.value",
+                                "deps": [],
+                                "args": {"value": lit_val},
+                            })
+                            deps.append(tmp)
+                    ssa = _ssa_new(var_name)
+                    ops.append({
+                        "id": ssa,
+                        "op": "PACK.dict",
+                        "deps": deps,
+                        "args": {"keys": keys},
                     })
                     return ssa
                 raise
@@ -310,7 +353,8 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         raise DSLParseError("output requires as=\"filename\"")
                     outputs.append({"from": ssa_from, "as": filename})
                 else:
-                    raise DSLParseError("Only settings() and output() calls allowed as expressions")
+                    # General expression call: represent as an op node too
+                    _emit_expr_call(call)
                 return None
             elif isinstance(stmt, ast.Return):
                 if isinstance(stmt.value, ast.Name):
@@ -411,6 +455,29 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 ctx_counts["loop"] += 1
                 context_suffix = f"loop{ctx_counts['loop']}"
                 versions, latest = versions_body, latest_body
+                # Predefine loop target variables as items from iterator for dependency resolution
+                def _bind_loop_target(target: ast.AST):
+                    if isinstance(target, ast.Name):
+                        ssa_item = _ssa_new(target.id)
+                        ops.append({
+                            "id": ssa_item,
+                            "op": "ITER.item",
+                            "deps": [iter_id],
+                            "args": {"target": target.id},
+                        })
+                    elif isinstance(target, ast.Tuple):
+                        for elt in target.elts:
+                            if isinstance(elt, ast.Name):
+                                ssa_item = _ssa_new(elt.id)
+                                ops.append({
+                                    "id": ssa_item,
+                                    "op": "ITER.item",
+                                    "deps": [iter_id],
+                                    "args": {"target": elt.id},
+                                })
+                    # Other patterns are ignored for now
+
+                _bind_loop_target(stmt.target)
                 for inner in stmt.body:
                     _parse_stmt(inner)
                 versions_body, latest_body = versions, latest
@@ -419,6 +486,16 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 # Add iter dep to first op in body
                 if len(ops) > body_ops_start:
                     ops[body_ops_start]["deps"] = [*ops[body_ops_start].get("deps", []), iter_id]
+                # Emit a summary foreach comp node depending on iterable value deps
+                iter_name_deps = _collect_value_deps(stmt.iter)
+                foreach_deps = [_ssa_get(n) for n in iter_name_deps]
+                ssa_foreach = _ssa_new("foreach")
+                ops.append({
+                    "id": ssa_foreach,
+                    "op": "COMP.foreach",
+                    "deps": foreach_deps,
+                    "args": {"target": t_label or ""},
+                })
                 # Loop-carried vars: only those existing pre-loop and reassigned in body
                 changed = {k for k in latest_body if pre_latest.get(k) != latest_body.get(k)}
                 carried = [k for k in changed if k in pre_latest]
@@ -461,7 +538,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "args": {"var": var},
                     })
                 return None
-            elif isinstance(stmt, (ast.Pass,)):
+            elif isinstance(stmt, (ast.Pass, ast.Continue, ast.Break)):
                 return None
             else:
                 raise DSLParseError("Only assignments, control flow, settings/output calls, and return are allowed in function body")

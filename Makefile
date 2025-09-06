@@ -33,7 +33,7 @@ build:
 	$(POETRY) build
 
 clean:
-	rm -rf __pycache__ .pytest_cache build dist *.egg-info plan.json plan.pseudo plan.svg
+	rm -rf __pycache__ .pytest_cache build dist *.egg-info plan.json plan.pseudo plan.svg plan.html
 
 # --- Release helpers ---
 

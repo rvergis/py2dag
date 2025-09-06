@@ -8,7 +8,7 @@
     body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; }
     header { padding: 10px 16px; background: #111; color: #eee; font-size: 14px; }
     #container { padding: 12px; }
-    svg { width: 100%; height: 80vh; border-top: 1px solid #ddd; }
+    svg { width: 100%; height: 80vh; border: 1px solid #ddd; margin: 10px; }
     .node rect { stroke: #666; fill: #fff; rx: 4; ry: 4; }
     .node.note rect { fill: #fff8dc; }
     .edgePath path { stroke: #333; fill: none; stroke-width: 1.2px; }
@@ -23,6 +23,7 @@
   </div>
   <script>
     const plan = {"version": 2, "function": "flow", "ops": [{"id": "a_1", "op": "AG1.src", "deps": [], "args": {}, "dep_labels": []}, {"id": "xs_1", "op": "AG1.op", "deps": ["a_1"], "args": {"param2": 42}, "dep_labels": ["param1"], "await": true}, {"id": "crossing_info_1", "op": "CONST.value", "deps": [], "args": {"value": null}}, {"id": "iter_1", "op": "ITER.eval", "deps": ["xs_1"], "args": {"expr": "xs", "kind": "for", "target": "x"}}, {"id": "x_1@loop1", "op": "ITER.item", "deps": ["iter_1"], "args": {"target": "x"}}, {"id": "call_1@loop1", "op": "AG3.proc", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "crossed_1@loop1", "op": "AG4.op2", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""], "await": true}, {"id": "cond_1@loop1", "op": "COND.eval", "deps": ["crossed_1@loop1"], "args": {"expr": "not crossed", "kind": "if"}}, {"id": "approx_time_1@loop1", "op": "AG3.op", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""], "await": true}, {"id": "data_1@loop1", "op": "AG4.op", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""], "await": true}, {"id": "lat_1@loop1", "op": "GET.item", "deps": ["data_1@loop1"], "args": {"key": "sensor_lat"}}, {"id": "lon_1@loop1", "op": "GET.item", "deps": ["data_1@loop1"], "args": {"key": "sensor_lon"}}, {"id": "call_2@loop1", "op": "AG4.proc", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "crossing_info_field_1@loop1", "op": "AG5.op3", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""], "await": true}, {"id": "crossing_info_2@loop1", "op": "PACK.dict", "deps": ["approx_time_1@loop1", "crossing_info_field_1@loop1", "x_1@loop1", "lat_1@loop1", "lon_1@loop1"], "args": {"keys": ["approx_time", "details", "item", "lat", "lon"]}}, {"id": "break_1@loop1", "op": "CTRL.break", "deps": [], "args": {}}, {"id": "foreach_1", "op": "COMP.foreach", "deps": ["xs_1"], "args": {"target": "x"}}, {"id": "crossing_info_2", "op": "PHI", "deps": ["crossing_info_1", "crossing_info_2@loop1"], "args": {"var": "crossing_info"}}], "outputs": [{"from": "crossing_info_2", "as": "return"}]};
+    const COLOR_MAP = {"AG1.src": "lightcoral", "AG1.op": "salmon", "CONST.value": "lightcoral", "ITER.eval": "turquoise", "ITER.item": "lightcoral", "AG3.proc": "sandybrown", "AG4.op2": "plum", "COND.eval": "orchid", "AG3.op": "gold", "AG4.op": "gold", "GET.item": "plum", "AG4.proc": "orchid", "AG5.op3": "lightcoral", "PACK.dict": "orchid", "CTRL.break": "mediumseagreen", "COMP.foreach": "orchid", "PHI": "mediumseagreen", "output": "plum"};
 
     function showMessage(msg) {
       const el = document.getElementById('container');
@@ -37,7 +38,7 @@
     } else {
       try {
         const g = new dagreD3.graphlib.Graph({ multigraph: true })
-          .setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
+          .setGraph({ rankdir: 'TB', nodesep: 30, ranksep: 40 });
         // Ensure edges have an object for labels/attrs to avoid TypeErrors
         g.setDefaultEdgeLabel(() => ({}));
 
@@ -56,13 +57,15 @@
             label = 'PHI' + (op.args && op.args.var ? ` (${op.args.var})` : '');
             klass = 'note';
           }
-          g.setNode(op.id, { label, class: klass, padding: 8 });
+          const color = COLOR_MAP[op.op] || '#fff';
+          g.setNode(op.id, { label, class: klass, padding: 8, style: 'fill: ' + color });
         });
 
         // Add output nodes and edges from source to output
         (plan.outputs || []).forEach(out => {
           const outId = `out:${out.as}`;
-          g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
+          const ocolor = COLOR_MAP['output'] || '#fff';
+          g.setNode(outId, { label: out.as, class: 'note', padding: 8, style: 'fill: ' + ocolor });
           g.setEdge(out.from, outId);
         });
 

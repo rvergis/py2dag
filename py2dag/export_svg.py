@@ -1,5 +1,7 @@
 from typing import Dict, Any
 
+from .colors import color_for
+
 try:
     from graphviz import Digraph
 except Exception:  # pragma: no cover
@@ -22,6 +24,9 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
         raise RuntimeError("Python package 'graphviz' is required for SVG export")
 
     graph = Digraph(format="svg")
+    # Top-down layout with a bounding box around the graph
+    graph.attr(rankdir="TB")
+    graph.attr("graph", margin="0.2", pad="0.3", color="#bbb")
 
     # Index ops for edge label decisions
     ops = list(plan.get("ops", []))
@@ -29,7 +34,12 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
 
     # Nodes
     for op in ops:
-        graph.node(op["id"], label=op["op"])
+        graph.node(
+            op["id"],
+            label=op["op"],
+            style="filled",
+            fillcolor=color_for(op["op"]),
+        )
 
     # Dependency edges with labels showing data/control
     for op in ops:
@@ -66,7 +76,13 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
             graph.edge(dep, op["id"], label=label or dep)
     for out in plan.get("outputs", []):
         out_id = f"out:{out['as']}"
-        graph.node(out_id, label=out['as'], shape="note")
+        graph.node(
+            out_id,
+            label=out['as'],
+            shape="note",
+            style="filled",
+            fillcolor=color_for("output"),
+        )
         graph.edge(out["from"], out_id)
 
     try:

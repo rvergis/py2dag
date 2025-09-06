@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from .colors import color_for
+
 
 HTML_TEMPLATE = """<!doctype html>
 <html lang="en">
@@ -15,7 +17,7 @@ HTML_TEMPLATE = """<!doctype html>
     body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 0; }
     header { padding: 10px 16px; background: #111; color: #eee; font-size: 14px; }
     #container { padding: 12px; }
-    svg { width: 100%; height: 80vh; border-top: 1px solid #ddd; }
+    svg { width: 100%; height: 80vh; border: 1px solid #ddd; margin: 10px; }
     .node rect { stroke: #666; fill: #fff; rx: 4; ry: 4; }
     .node.note rect { fill: #fff8dc; }
     .edgePath path { stroke: #333; fill: none; stroke-width: 1.2px; }
@@ -30,6 +32,7 @@ HTML_TEMPLATE = """<!doctype html>
   </div>
   <script>
     const plan = __PLAN_JSON__;
+    const COLOR_MAP = __COLOR_MAP__;
 
     function showMessage(msg) {
       const el = document.getElementById('container');
@@ -44,7 +47,7 @@ HTML_TEMPLATE = """<!doctype html>
     } else {
       try {
         const g = new dagreD3.graphlib.Graph({ multigraph: true })
-          .setGraph({ rankdir: 'LR', nodesep: 30, ranksep: 40 });
+          .setGraph({ rankdir: 'TB', nodesep: 30, ranksep: 40 });
         // Ensure edges have an object for labels/attrs to avoid TypeErrors
         g.setDefaultEdgeLabel(() => ({}));
 
@@ -63,13 +66,15 @@ HTML_TEMPLATE = """<!doctype html>
             label = 'PHI' + (op.args && op.args.var ? ` (${op.args.var})` : '');
             klass = 'note';
           }
-          g.setNode(op.id, { label, class: klass, padding: 8 });
+          const color = COLOR_MAP[op.op] || '#fff';
+          g.setNode(op.id, { label, class: klass, padding: 8, style: 'fill: ' + color });
         });
 
         // Add output nodes and edges from source to output
         (plan.outputs || []).forEach(out => {
           const outId = `out:${out.as}`;
-          g.setNode(outId, { label: out.as, class: 'note', padding: 8 });
+          const ocolor = COLOR_MAP['output'] || '#fff';
+          g.setNode(outId, { label: out.as, class: 'note', padding: 8, style: 'fill: ' + ocolor });
           g.setEdge(out.from, outId);
         });
 
@@ -136,7 +141,10 @@ def export(plan: Dict[str, Any], filename: str = "plan.html") -> str:
 
     Returns the written filename.
     """
+    color_map = {op["op"]: color_for(op["op"]) for op in plan.get("ops", [])}
+    color_map["output"] = color_for("output")
     html = HTML_TEMPLATE.replace("__PLAN_JSON__", json.dumps(plan))
+    html = html.replace("__COLOR_MAP__", json.dumps(color_map))
     path = Path(filename)
     path.write_text(html, encoding="utf-8")
     return str(path)

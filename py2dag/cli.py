@@ -267,6 +267,47 @@ def _to_nodes_edges(plan: dict) -> dict:
                         label = str((src.get("args") or {}).get("target") or "iter")
             edges.append({"from": from_id, "to": to_id, "label": label})
 
+    # Add explicit true/false edges for `if ...: continue` patterns inside loops
+    # When an IF inside a loop has a `continue` body and no explicit else branch,
+    # no edges are emitted from the COND node to represent the two control-flow
+    # outcomes.  Detect such cases and add synthetic edges so that both the
+    # "true" (continue) and "false" paths are visible in the exported graph.
+    for idx, op in enumerate(ops):
+        if op.get("op") != "COND.eval":
+            continue
+        oid = op["id"]
+        if "@" not in oid:
+            continue
+        _, ctx = oid.split("@", 1)
+        if not ctx.startswith("loop"):
+            continue
+        from_id = id_map[oid]
+        existing = [e for e in edges if e["from"] == from_id]
+        # Skip if we already have explicit branch labels from this cond
+        if any(e.get("label") in {"then", "else", "true", "false"} for e in existing):
+            continue
+        # Find first op after this cond within the same loop context
+        next_op = None
+        for later in ops[idx + 1 :]:
+            if later["id"].endswith(f"@{ctx}"):
+                next_op = later
+                break
+        if next_op is not None:
+            to_id = id_map[next_op["id"]]
+            # If an unlabeled edge already exists, relabel it as the false branch
+            updated = False
+            for e in existing:
+                if e["to"] == to_id:
+                    e["label"] = "false"
+                    updated = True
+                    break
+            if not updated:
+                edges.append({"from": from_id, "to": to_id, "label": "false"})
+        # True branch loops back to the for-loop node itself
+        loop_node = loop_ctx_map.get(ctx)
+        if loop_node:
+            edges.append({"from": from_id, "to": loop_node, "label": "true"})
+
     # Output nodes and edges
     for out in outputs:
         out_id = f"out:{out['as']}"

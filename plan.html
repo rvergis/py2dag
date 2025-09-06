@@ -1,11 +1,4 @@
-from __future__ import annotations
-
-import json
-from pathlib import Path
-from typing import Any, Dict
-
-
-HTML_TEMPLATE = """<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -29,7 +22,7 @@ HTML_TEMPLATE = """<!doctype html>
     <svg><g/></svg>
   </div>
   <script>
-    const plan = __PLAN_JSON__;
+    const plan = {"version": 2, "function": "flow", "ops": [{"id": "a_1", "op": "AG1.src", "deps": [], "args": {}, "dep_labels": []}, {"id": "xs_1", "op": "AG1.op", "deps": ["a_1"], "args": {"param2": 42}, "dep_labels": ["param1"]}, {"id": "crossing_info_1", "op": "CONST.value", "deps": [], "args": {"value": null}}, {"id": "iter_1", "op": "ITER.eval", "deps": ["xs_1"], "args": {"expr": "xs", "kind": "for", "target": "x"}}, {"id": "x_1@loop1", "op": "ITER.item", "deps": ["iter_1"], "args": {"target": "x"}}, {"id": "call_1@loop1", "op": "AG3.proc", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "crossed_1@loop1", "op": "AG4.op2", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "cond_1@loop1", "op": "COND.eval", "deps": ["crossed_1@loop1"], "args": {"expr": "not crossed", "kind": "if"}}, {"id": "approx_time_1@loop1", "op": "AG3.op", "deps": ["x_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "data_1@loop1", "op": "AG4.op", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "lat_1@loop1", "op": "GET.item", "deps": ["data_1@loop1"], "args": {"key": "sensor_lat"}}, {"id": "lon_1@loop1", "op": "GET.item", "deps": ["data_1@loop1"], "args": {"key": "sensor_lon"}}, {"id": "call_2@loop1", "op": "AG4.proc", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "crossing_info_field_1@loop1", "op": "AG5.op3", "deps": ["approx_time_1@loop1"], "args": {}, "dep_labels": [""]}, {"id": "crossing_info_2@loop1", "op": "PACK.dict", "deps": ["approx_time_1@loop1", "crossing_info_field_1@loop1", "x_1@loop1", "lat_1@loop1", "lon_1@loop1"], "args": {"keys": ["approx_time", "details", "item", "lat", "lon"]}}, {"id": "foreach_1", "op": "COMP.foreach", "deps": ["xs_1"], "args": {"target": "x"}}, {"id": "crossing_info_2", "op": "PHI", "deps": ["crossing_info_1", "crossing_info_2@loop1"], "args": {"var": "crossing_info"}}], "outputs": [{"from": "crossing_info_2", "as": "return"}]};
 
     function showMessage(msg) {
       const el = document.getElementById('container');
@@ -128,15 +121,3 @@ HTML_TEMPLATE = """<!doctype html>
   </script>
 </body>
 </html>
-"""
-
-
-def export(plan: Dict[str, Any], filename: str = "plan.html") -> str:
-    """Export the plan as an interactive HTML using Dagre (via dagre-d3).
-
-    Returns the written filename.
-    """
-    html = HTML_TEMPLATE.replace("__PLAN_JSON__", json.dumps(plan))
-    path = Path(filename)
-    path.write_text(html, encoding="utf-8")
-    return str(path)

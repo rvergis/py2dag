@@ -1,0 +1,309 @@
+{
+  "version": 2,
+  "function": "flow",
+  "nodes": [
+    {
+      "id": "a_1",
+      "type": "call",
+      "label": "AG1.src",
+      "var": "a",
+      "expr": "AG1.src()",
+      "args": {}
+    },
+    {
+      "id": "xs_1",
+      "type": "call",
+      "label": "AG1.op",
+      "var": "xs",
+      "expr": "AG1.op(param1=a, param2=42)",
+      "args": {
+        "param1": "a_1",
+        "param2": 42
+      }
+    },
+    {
+      "id": "crossing_info_1",
+      "type": "const",
+      "label": "CONST.value",
+      "var": "crossing_info",
+      "expr": "null",
+      "args": {
+        "value": null
+      }
+    },
+    {
+      "id": "for_loop_1",
+      "type": "forloop",
+      "label": "forloop",
+      "var": "x",
+      "expr": "for x in xs",
+      "args": {
+        "0": "xs_1",
+        "expr": "xs",
+        "kind": "for",
+        "target": "x"
+      }
+    },
+    {
+      "id": "x_1@for_loop_1",
+      "type": "forloop_item",
+      "label": "FORLOOP.item",
+      "var": "x",
+      "expr": "x"
+    },
+    {
+      "id": "AG3.proc@for_loop_1#1",
+      "type": "call",
+      "label": "AG3.proc",
+      "var": "call",
+      "expr": "AG3.proc(x)",
+      "args": {
+        "0": "x_1@for_loop_1"
+      }
+    },
+    {
+      "id": "crossed_1@for_loop_1",
+      "type": "call",
+      "label": "AG4.op2",
+      "var": "crossed",
+      "expr": "AG4.op2(x)",
+      "args": {
+        "0": "x_1@for_loop_1"
+      }
+    },
+    {
+      "id": "cond_1@for_loop_1",
+      "type": "if",
+      "label": "COND.eval",
+      "var": "cond",
+      "expr": "if not crossed",
+      "args": {
+        "0": "crossed_1@for_loop_1",
+        "expr": "not crossed",
+        "kind": "if"
+      }
+    },
+    {
+      "id": "approx_time_1@for_loop_1",
+      "type": "call",
+      "label": "AG3.op",
+      "var": "approx_time",
+      "expr": "AG3.op(x)",
+      "args": {
+        "0": "x_1@for_loop_1"
+      }
+    },
+    {
+      "id": "data_1@for_loop_1",
+      "type": "call",
+      "label": "AG4.op",
+      "var": "data",
+      "expr": "AG4.op(approx_time)",
+      "args": {
+        "0": "approx_time_1@for_loop_1"
+      }
+    },
+    {
+      "id": "lat_1@for_loop_1",
+      "type": "get_item",
+      "label": "GET.item",
+      "var": "lat",
+      "expr": "data[\"sensor_lat\"]",
+      "args": {
+        "0": "data_1@for_loop_1",
+        "key": "sensor_lat"
+      }
+    },
+    {
+      "id": "lon_1@for_loop_1",
+      "type": "get_item",
+      "label": "GET.item",
+      "var": "lon",
+      "expr": "data[\"sensor_lon\"]",
+      "args": {
+        "0": "data_1@for_loop_1",
+        "key": "sensor_lon"
+      }
+    },
+    {
+      "id": "AG4.proc@for_loop_1#1",
+      "type": "call",
+      "label": "AG4.proc",
+      "var": "call",
+      "expr": "AG4.proc(approx_time)",
+      "args": {
+        "0": "approx_time_1@for_loop_1"
+      }
+    },
+    {
+      "id": "crossing_info_field_1@for_loop_1",
+      "type": "call",
+      "label": "AG5.op3",
+      "var": "crossing_info_field",
+      "expr": "AG5.op3(approx_time)",
+      "args": {
+        "0": "approx_time_1@for_loop_1"
+      }
+    },
+    {
+      "id": "crossing_info_2@for_loop_1",
+      "type": "pack:dict",
+      "label": "PACK.dict",
+      "var": "crossing_info",
+      "expr": "{approx_time: approx_time, details: crossing_info_field, item: x, lat: lat, lon: lon}",
+      "args": {
+        "0": "approx_time_1@for_loop_1",
+        "1": "crossing_info_field_1@for_loop_1",
+        "2": "x_1@for_loop_1",
+        "3": "lat_1@for_loop_1",
+        "4": "lon_1@for_loop_1",
+        "keys": [
+          "approx_time",
+          "details",
+          "item",
+          "lat",
+          "lon"
+        ]
+      }
+    },
+    {
+      "id": "foreach_1",
+      "type": "comp:foreach",
+      "label": "COMP.foreach",
+      "var": "foreach",
+      "expr": "COMP.foreach",
+      "args": {
+        "0": "xs_1",
+        "target": "x"
+      }
+    },
+    {
+      "id": "crossing_info_2",
+      "type": "phi",
+      "label": "PHI",
+      "var": "crossing_info",
+      "expr": "phi(crossing_info, crossing_info)",
+      "args": {
+        "0": "crossing_info_1",
+        "1": "crossing_info_2@for_loop_1",
+        "var": "crossing_info"
+      }
+    },
+    {
+      "id": "out:return",
+      "type": "output",
+      "label": "return",
+      "var": "return",
+      "expr": "return",
+      "args": {
+        "kind": "output"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "a_1",
+      "to": "xs_1",
+      "label": "param1"
+    },
+    {
+      "from": "xs_1",
+      "to": "for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "for_loop_1",
+      "to": "x_1@for_loop_1",
+      "label": "x"
+    },
+    {
+      "from": "x_1@for_loop_1",
+      "to": "AG3.proc@for_loop_1#1",
+      "label": ""
+    },
+    {
+      "from": "x_1@for_loop_1",
+      "to": "crossed_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "crossed_1@for_loop_1",
+      "to": "cond_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "x_1@for_loop_1",
+      "to": "approx_time_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "approx_time_1@for_loop_1",
+      "to": "data_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "data_1@for_loop_1",
+      "to": "lat_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "data_1@for_loop_1",
+      "to": "lon_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "approx_time_1@for_loop_1",
+      "to": "AG4.proc@for_loop_1#1",
+      "label": ""
+    },
+    {
+      "from": "approx_time_1@for_loop_1",
+      "to": "crossing_info_field_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "approx_time_1@for_loop_1",
+      "to": "crossing_info_2@for_loop_1",
+      "label": "approx_time"
+    },
+    {
+      "from": "crossing_info_field_1@for_loop_1",
+      "to": "crossing_info_2@for_loop_1",
+      "label": "details"
+    },
+    {
+      "from": "x_1@for_loop_1",
+      "to": "crossing_info_2@for_loop_1",
+      "label": "item"
+    },
+    {
+      "from": "lat_1@for_loop_1",
+      "to": "crossing_info_2@for_loop_1",
+      "label": "lat"
+    },
+    {
+      "from": "lon_1@for_loop_1",
+      "to": "crossing_info_2@for_loop_1",
+      "label": "lon"
+    },
+    {
+      "from": "xs_1",
+      "to": "foreach_1",
+      "label": ""
+    },
+    {
+      "from": "crossing_info_1",
+      "to": "crossing_info_2",
+      "label": ""
+    },
+    {
+      "from": "crossing_info_2@for_loop_1",
+      "to": "crossing_info_2",
+      "label": ""
+    },
+    {
+      "from": "crossing_info_2",
+      "to": "out:return"
+    }
+  ]
+}

@@ -33,16 +33,37 @@ def export(plan: Dict[str, Any], filename: str = "plan.svg") -> str:
 
     # Dependency edges with labels showing data/control
     for op in ops:
-        for dep in op.get("deps", []):
+        dep_labels = op.get("dep_labels", []) or []
+        seen = set()
+        for idx, dep in enumerate(op.get("deps", []) or []):
+            pair = (dep, op["id"]) 
+            if pair in seen:
+                continue
+            seen.add(pair)
             src = op_by_id.get(dep)
-            label = dep  # default to SSA id
-            if src is not None:
-                if src.get("op") == "COND.eval":
-                    label = "cond"
-                elif src.get("op") == "ITER.eval":
-                    args = src.get("args", {}) or {}
-                    label = str(args.get("target") or "iter")
-            graph.edge(dep, op["id"], label=label)
+            label = (dep_labels[idx] if idx < len(dep_labels) else "") or ""
+            if not label:
+                if op.get("op") == "PACK.dict":
+                    keys = (op.get("args", {}) or {}).get("keys", []) or []
+                    if idx < len(keys):
+                        label = str(keys[idx])
+                elif src is not None:
+                    if src.get("op") == "COND.eval":
+                        const_args = src.get("args", {}) or {}
+                        if const_args.get("kind") == "if":
+                            dest_id = op.get("id", "")
+                            if "@then" in dest_id:
+                                label = "then"
+                            elif "@else" in dest_id:
+                                label = "else"
+                            else:
+                                label = "cond"
+                        else:
+                            label = "cond"
+                    elif src.get("op") == "ITER.eval":
+                        args = src.get("args", {}) or {}
+                        label = str(args.get("target") or "iter")
+            graph.edge(dep, op["id"], label=label or dep)
     for out in plan.get("outputs", []):
         out_id = f"out:{out['as']}"
         graph.node(out_id, label=out['as'], shape="note")

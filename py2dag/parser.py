@@ -121,6 +121,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         def _emit_assign_from_call(var_name: str, call: ast.Call) -> str:
             op_name = _get_call_name(call.func)
             deps: List[str] = []
+            dep_labels: List[str] = []
 
             def _expand_star_name(ssa_var: str) -> List[str]:
                 # Expand if previous op was a PACK.*
@@ -133,21 +134,26 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 if isinstance(arg, ast.Starred):
                     star_val = arg.value
                     if isinstance(star_val, ast.Name):
-                        deps.extend(_expand_star_name(_ssa_get(star_val.id)))
+                        expanded = _expand_star_name(_ssa_get(star_val.id))
+                        deps.extend(expanded)
+                        dep_labels.extend(["*"] * len(expanded))
                     elif isinstance(star_val, (ast.List, ast.Tuple)):
                         for elt in star_val.elts:
                             if not isinstance(elt, ast.Name):
                                 raise DSLParseError("Starred list/tuple elements must be names")
                             deps.append(_ssa_get(elt.id))
+                            dep_labels.append("*")
                     else:
                         raise DSLParseError("*args must be a name or list/tuple of names")
                 elif isinstance(arg, ast.Name):
                     deps.append(_ssa_get(arg.id))
+                    dep_labels.append("")
                 elif isinstance(arg, (ast.List, ast.Tuple)):
                     for elt in arg.elts:
                         if not isinstance(elt, ast.Name):
                             raise DSLParseError("List/Tuple positional args must be variable names")
                         deps.append(_ssa_get(elt.id))
+                        dep_labels.append("")
                 else:
                     raise DSLParseError("Positional args must be variable names or lists/tuples of names")
 
@@ -161,16 +167,18 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                             kwargs[str(k)] = val
                     elif isinstance(v, ast.Name):
                         deps.append(_ssa_get(v.id))
+                        dep_labels.append("**")
                     else:
                         raise DSLParseError("**kwargs must be a dict literal or a variable name")
                 else:
                     if isinstance(kw.value, ast.Name):
                         deps.append(_ssa_get(kw.value.id))
+                        dep_labels.append(kw.arg or "")
                     else:
                         kwargs[kw.arg] = _literal(kw.value)
 
             ssa = _ssa_new(var_name)
-            ops.append({"id": ssa, "op": op_name, "deps": deps, "args": kwargs})
+            ops.append({"id": ssa, "op": op_name, "deps": deps, "args": kwargs, "dep_labels": dep_labels})
             return ssa
 
         def _emit_expr_call(call: ast.Call) -> str:
@@ -505,9 +513,12 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 versions_body, latest_body = versions, latest
                 versions, latest = saved_versions, saved_latest
                 context_suffix = saved_ctx
-                # Add iter dep to first op in body
+                # Add iter dep to first op in body if not already present
                 if len(ops) > body_ops_start:
-                    ops[body_ops_start]["deps"] = [*ops[body_ops_start].get("deps", []), iter_id]
+                    first = ops[body_ops_start]
+                    deps0 = first.get("deps", []) or []
+                    if iter_id not in deps0:
+                        first["deps"] = [*deps0, iter_id]
                 # Emit a summary foreach comp node depending on iterable value deps
                 iter_name_deps = _collect_value_deps(stmt.iter)
                 foreach_deps = [_ssa_get(n) for n in iter_name_deps]
@@ -548,7 +559,10 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 versions, latest = saved_versions, saved_latest
                 context_suffix = saved_ctx
                 if len(ops) > body_ops_start:
-                    ops[body_ops_start]["deps"] = [*ops[body_ops_start].get("deps", []), cond_id]
+                    first = ops[body_ops_start]
+                    deps0 = first.get("deps", []) or []
+                    if cond_id not in deps0:
+                        first["deps"] = [*deps0, cond_id]
                 changed = {k for k in latest_body if pre_latest.get(k) != latest_body.get(k)}
                 carried = [k for k in changed if k in pre_latest]
                 for var in sorted(carried):

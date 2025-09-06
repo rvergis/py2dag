@@ -6,10 +6,6 @@ POETRY ?= poetry
 PYTHON ?= python3
 WITH_SVG ?= 1
 
-# Example usage: make run FILE=examples/sample.py ARGS="--html --func describe_scene_at_50_seconds"
-FILE ?= examples/sample.py
-ARGS ?= --html --func describe_scene_at_50_seconds
-
 test:
 	$(POETRY) run pytest -s tests
 
@@ -27,7 +23,8 @@ shell:
 	$(POETRY) shell
 
 run:
-	$(POETRY) run py2dag $(FILE) $(ARGS)
+# 	$(POETRY) run py2dag examples/sample1.py --html --func describe_scene_at_50_seconds
+	$(POETRY) run py2dag examples/sample2.py --html
 
 build:
 	$(POETRY) build

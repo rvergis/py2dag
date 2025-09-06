@@ -17,7 +17,7 @@ def _export_json(plan, out_dir: Path, name: str) -> Path:
     """Helper to write a DAG JSON file for the given plan."""
     outfile = out_dir / name
     data = cli._to_nodes_edges(plan)
-    outfile.write_text(json.dumps(data), encoding="utf-8")
+    outfile.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return outfile
 
 

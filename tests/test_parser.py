@@ -1,5 +1,5 @@
 import pytest
-from py2dag import parser
+from py2dag import parser, cli
 
 
 def test_linear_calls_with_ssa():
@@ -148,4 +148,35 @@ async def flow():
     assert len(comp["deps"]) == 1
     field_op = next(op for op in plan["ops"] if op["op"] == "AG5.op3")
     assert field_op.get("await") is True
+
+
+def test_break_node_type():
+    code = '''
+async def flow():
+    a = AG1.src()
+    xs = await AG1.op(param1=a, param2=42)
+    crossing_info = None
+    for x in xs:
+        AG3.proc(x)
+        crossed = await AG4.op2(x)
+        if not crossed:
+            continue
+        approx_time = await AG3.op(x)
+        data = await AG4.op(approx_time)
+        lat = data["sensor_lat"]
+        lon = data["sensor_lon"]
+        AG4.proc(approx_time)
+        crossing_info = {
+            "approx_time": approx_time,
+            "details": await AG5.op3(approx_time),
+            "item": x,
+            "lat": lat,
+            "lon": lon,
+        }
+        break
+    return crossing_info
+'''
+    plan = parser.parse(code)
+    graph = cli._to_nodes_edges(plan)
+    assert any(node["type"] == "break" for node in graph["nodes"])
 

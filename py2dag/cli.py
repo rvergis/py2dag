@@ -143,6 +143,8 @@ def _to_nodes_edges(plan: dict) -> dict:
             return "forloop_item"
         if op_name == "PHI":
             return "phi"
+        if op_name == "CTRL.break":
+            return "break"
         if op_name.startswith("COMP."):
             comp = op_name.split(".", 1)[1]
             return f"comp:{comp}"

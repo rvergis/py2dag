@@ -581,7 +581,11 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "args": {"var": var},
                     })
                 return None
-            elif isinstance(stmt, (ast.Pass, ast.Continue, ast.Break)):
+            elif isinstance(stmt, ast.Break):
+                ssa = _ssa_new("break")
+                ops.append({"id": ssa, "op": "CTRL.break", "deps": [], "args": {}})
+                return None
+            elif isinstance(stmt, (ast.Pass, ast.Continue)):
                 return None
             else:
                 raise DSLParseError("Only assignments, control flow, settings/output calls, and return are allowed in function body")

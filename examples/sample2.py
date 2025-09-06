@@ -19,4 +19,5 @@ async def flow():
             "lat": lat,
             "lon": lon,
         }
+        break
     return crossing_info

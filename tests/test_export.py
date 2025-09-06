@@ -1,6 +1,24 @@
+import json
+from pathlib import Path
+import sys
+
 import pytest
 
+# Ensure the package root is importable when tests are executed directly
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from py2dag import parser
+from py2dag import cli
+
+
+def _export_json(plan, out_dir: Path, name: str) -> Path:
+    """Helper to write a DAG JSON file for the given plan."""
+    outfile = out_dir / name
+    data = cli._to_nodes_edges(plan)
+    outfile.write_text(json.dumps(data), encoding="utf-8")
+    return outfile
 
 
 def _plan_simple():
@@ -14,7 +32,6 @@ def flow():
 
 def test_export_html():
     from py2dag import export_dagre
-    from pathlib import Path
 
     plan = _plan_simple()
     out_dir = Path('.out'); out_dir.mkdir(exist_ok=True)
@@ -27,10 +44,13 @@ def test_export_html():
     assert '"version": 2' in text
     assert plan["function"] in text
 
+    # Also write out the DAG JSON representation
+    json_file = _export_json(plan, out_dir, "plan.json")
+    assert json_file.exists()
+
 
 def test_export_svg():
     from py2dag import export_svg
-    from pathlib import Path
 
     plan = _plan_simple()
     out_dir = Path('.out'); out_dir.mkdir(exist_ok=True)
@@ -43,6 +63,10 @@ def test_export_svg():
     assert outfile.exists()
     content = outfile.read_text(encoding="utf-8", errors="ignore").lower()
     assert "<svg" in content
+
+    # Also ensure the DAG JSON is produced
+    json_file = _export_json(plan, out_dir, "plan.json")
+    assert json_file.exists()
 
 
 def _plan_kitchen_sink():
@@ -72,7 +96,6 @@ def kitchen_sink():
 
 def test_export_html_kitchen_sink():
     from py2dag import export_dagre
-    from pathlib import Path
 
     plan = _plan_kitchen_sink()
     out_dir = Path('.out'); out_dir.mkdir(exist_ok=True)
@@ -86,10 +109,12 @@ def test_export_html_kitchen_sink():
     assert "IF " in text or "COND.eval" in text
     assert "PHI" in text
 
+    json_file = _export_json(plan, out_dir, "kitchen_sink.json")
+    assert json_file.exists()
+
 
 def test_export_svg_kitchen_sink():
     from py2dag import export_svg
-    from pathlib import Path
 
     plan = _plan_kitchen_sink()
     out_dir = Path('.out'); out_dir.mkdir(exist_ok=True)
@@ -100,3 +125,6 @@ def test_export_svg_kitchen_sink():
         pytest.skip("Graphviz not available; skipping SVG export test")
     content = outfile.read_text(encoding="utf-8", errors="ignore").lower()
     assert "<svg" in content
+
+    json_file = _export_json(plan, out_dir, "kitchen_sink.json")
+    assert json_file.exists()

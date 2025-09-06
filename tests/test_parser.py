@@ -22,9 +22,26 @@ def flow():
     assert plan["version"] == 2
     ops = plan["ops"]
     assert ops[0]["op"] == "AG.op1"
-    assert ops[1]["op"] == "AG.op2"
-    assert ops[0]["id"] != ops[1]["id"]
-    assert plan["outputs"][0]["from"] == ops[1]["id"]
+    b_op = next(op for op in ops if op["op"] == "AG.op2")
+    assert ops[0]["id"] != b_op["id"]
+    assert plan["outputs"][0]["from"] == b_op["id"]
+
+
+def test_const_kwarg_emits_const_node():
+    code = '''
+def flow():
+    a = TOOL1.op1()
+    b = TOOL2.op2(a, k=2)
+    return b
+'''
+    plan = parser.parse(code)
+    ops = plan["ops"]
+    const = next(op for op in ops if op["op"] == "CONST.value" and op["args"].get("value") == 2)
+    b_op = next(op for op in ops if op["op"] == "TOOL2.op2")
+    assert const["id"] in b_op.get("deps", [])
+    idx = b_op["deps"].index(const["id"])
+    assert b_op.get("dep_labels", [])[idx] == "k"
+    assert b_op.get("args", {}).get("k") == 2
 
 
 def test_if_merges_with_phi():

@@ -43,6 +43,7 @@ def test_export_html():
     # Basic sanity: embedded plan JSON is present
     assert '"version": 2' in text
     assert plan["function"] in text
+    assert 'padding: 10px' in text
 
     # Also write out the DAG JSON representation
     json_file = _export_json(plan, out_dir, "plan.json")

@@ -100,10 +100,22 @@ def _to_nodes_edges(plan: dict) -> dict:
         # Generic tool/attribute call ops
         if op_name.endswith(".op") or "." in op_name:
             parts = []
+            used_args = set()
             # Encode deps in original order, honoring labels for kwargs and vararg markers
             for i, name in enumerate(dep_names):
                 lbl = dep_labels[i] if i < len(dep_labels) else ""
-                if lbl == "*":
+                dep_id = deps[i] if i < len(deps) else ""
+                src = op_by_id.get(dep_id)
+                if (
+                    lbl
+                    and src
+                    and src.get("op") == "CONST.value"
+                    and isinstance(args, dict)
+                    and lbl in args
+                ):
+                    parts.append(f"{lbl}={_json.dumps(args[lbl])}")
+                    used_args.add(lbl)
+                elif lbl == "*":
                     parts.append(f"*{name}")
                 elif lbl == "**":
                     parts.append(f"**{name}")
@@ -113,7 +125,7 @@ def _to_nodes_edges(plan: dict) -> dict:
                     parts.append(name)
             # Append literal kwargs (in insertion order)
             for k, v in (args.items() if isinstance(args, dict) else []):
-                if k in {"template", "expr", "kind", "keys", "target", "var"}:
+                if k in {"template", "expr", "kind", "keys", "target", "var"} or k in used_args:
                     continue
                 parts.append(f"{k}={_json.dumps(v)}")
             return f"{op_name}(" + ", ".join(parts) + ")"

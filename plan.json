@@ -167,6 +167,16 @@
       }
     },
     {
+      "id": "break_1@for_loop_1",
+      "type": "break",
+      "label": "BREAK.loop",
+      "var": "break",
+      "expr": "break",
+      "args": {
+        "0": "crossing_info_2@for_loop_1"
+      }
+    },
+    {
       "id": "foreach_1",
       "type": "comp:foreach",
       "label": "COMP.foreach",
@@ -185,7 +195,7 @@
       "expr": "phi(crossing_info, crossing_info)",
       "args": {
         "0": "crossing_info_1",
-        "1": "crossing_info_2@for_loop_1",
+        "1": "break_1@for_loop_1",
         "var": "crossing_info"
       }
     },
@@ -298,6 +308,11 @@
     },
     {
       "from": "crossing_info_2@for_loop_1",
+      "to": "break_1@for_loop_1",
+      "label": ""
+    },
+    {
+      "from": "break_1@for_loop_1",
       "to": "crossing_info_2",
       "label": ""
     },

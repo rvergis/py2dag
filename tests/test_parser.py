@@ -146,4 +146,6 @@ async def flow():
     plan = parser.parse(code)
     comp = next(op for op in plan["ops"] if op["op"].startswith("COMP."))
     assert len(comp["deps"]) == 1
+    field_op = next(op for op in plan["ops"] if op["op"] == "AG5.op3")
+    assert field_op.get("await") is True
 

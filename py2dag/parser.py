@@ -118,7 +118,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             except Exception:
                 return node.__class__.__name__
 
-        def _emit_assign_from_call(var_name: str, call: ast.Call) -> str:
+        def _emit_assign_from_call(var_name: str, call: ast.Call, awaited: bool = False) -> str:
             op_name = _get_call_name(call.func)
             deps: List[str] = []
             dep_labels: List[str] = []
@@ -178,12 +178,15 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         kwargs[kw.arg] = _literal(kw.value)
 
             ssa = _ssa_new(var_name)
-            ops.append({"id": ssa, "op": op_name, "deps": deps, "args": kwargs, "dep_labels": dep_labels})
+            op: Dict[str, Any] = {"id": ssa, "op": op_name, "deps": deps, "args": kwargs, "dep_labels": dep_labels}
+            if awaited:
+                op["await"] = True
+            ops.append(op)
             return ssa
 
-        def _emit_expr_call(call: ast.Call) -> str:
+        def _emit_expr_call(call: ast.Call, awaited: bool = False) -> str:
             """Emit a node for a bare expression call (no assignment)."""
-            return _emit_assign_from_call("call", call)
+            return _emit_assign_from_call("call", call, awaited)
 
         def _emit_assign_from_fstring(var_name: str, fstr: ast.JoinedStr) -> str:
             deps: List[str] = []
@@ -249,7 +252,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                             inner = v_node.value
                             if not isinstance(inner, ast.Call):
                                 raise DSLParseError("await must wrap a call in dict value")
-                            tmp_id = _emit_assign_from_call(f"{var_name}_field", inner)
+                            tmp_id = _emit_assign_from_call(f"{var_name}_field", inner, awaited=True)
                             deps.append(tmp_id)
                         elif isinstance(v_node, ast.Call):
                             tmp_id = _emit_assign_from_call(f"{var_name}_field", v_node)
@@ -340,10 +343,12 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     raise DSLParseError("Assignment targets must be simple names")
                 var_name = stmt.targets[0].id
                 value = stmt.value
+                awaited = False
                 if isinstance(value, ast.Await):
                     value = value.value
+                    awaited = True
                 if isinstance(value, ast.Call):
-                    return _emit_assign_from_call(var_name, value)
+                    return _emit_assign_from_call(var_name, value, awaited)
                 elif isinstance(value, ast.JoinedStr):
                     return _emit_assign_from_fstring(var_name, value)
                 elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
@@ -356,8 +361,10 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     raise DSLParseError("Right hand side must be a call or f-string")
             elif isinstance(stmt, ast.Expr):
                 call = stmt.value
+                awaited = False
                 if isinstance(call, ast.Await):
                     call = call.value
+                    awaited = True
                 if not isinstance(call, ast.Call):
                     raise DSLParseError("Only call expressions allowed at top level")
                 name = _get_call_name(call.func)
@@ -384,7 +391,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     outputs.append({"from": ssa_from, "as": filename})
                 else:
                     # General expression call: represent as an op node too
-                    _emit_expr_call(call)
+                    _emit_expr_call(call, awaited)
                 return None
             elif isinstance(stmt, ast.Return):
                 if isinstance(stmt.value, ast.Name):

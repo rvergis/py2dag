@@ -27,6 +27,7 @@ run:
 	for file in examples/sample1.py examples/sample2.py; do \
 		base=$$(basename $$file .py); \
 		$(POETRY) run py2dag $$file --html; \
+		cp $$file .out/$$base.py; \
 		mv plan.json .out/$$base.json; \
 		mv plan.pseudo .out/$$base.pseudocode; \
 		mv plan.html .out/$$base.html; \

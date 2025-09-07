@@ -23,14 +23,19 @@ shell:
 	$(POETRY) shell
 
 run:
-# 	$(POETRY) run py2dag examples/sample1.py --html --func describe_scene_at_50_seconds
-	$(POETRY) run py2dag examples/sample2.py --html
-
+	mkdir -p .out
+	for file in examples/sample1.py examples/sample2.py; do \
+		base=$$(basename $$file .py); \
+		$(POETRY) run py2dag $$file --html; \
+		mv plan.json .out/$$base.json; \
+		mv plan.pseudo .out/$$base.pseudocode; \
+		mv plan.html .out/$$base.html; \
+	done
 build:
 	$(POETRY) build
 
 clean:
-	rm -rf __pycache__ .pytest_cache build dist *.egg-info plan.json plan.pseudo plan.svg plan.html
+	rm -rf __pycache__ .pytest_cache build dist *.egg-info plan.json plan.pseudo plan.svg plan.html .out
 
 # --- Release helpers ---
 

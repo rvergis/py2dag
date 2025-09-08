@@ -63,6 +63,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         latest: Dict[str, str] = {}
         context_suffix: str = ""
         ctx_counts: Dict[str, int] = {"if": 0, "loop": 0, "while": 0, "except": 0}
+        loop_depth = 0
 
         def _ssa_new(name: str) -> str:
             if not VALID_NAME_RE.match(name):
@@ -331,6 +332,48 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             })
             return ssa
 
+        def _emit_assign_to_subscript(target: ast.Subscript, value: ast.AST) -> str:
+            """Emit a SET.item node for an assignment like ``name[key] = value``."""
+            base = target.value
+            if not isinstance(base, ast.Name):
+                raise DSLParseError("Subscript base must be a variable name")
+            # Extract slice expression across Python versions
+            sl = getattr(target, "slice", None)
+            if hasattr(ast, "Index") and isinstance(sl, getattr(ast, "Index")):  # type: ignore[attr-defined]
+                sl = sl.value  # type: ignore[assignment]
+            key = _literal(sl)
+
+            awaited = False
+            if isinstance(value, ast.Await):
+                value = value.value
+                awaited = True
+
+            # Determine SSA id for RHS value
+            if isinstance(value, ast.Call):
+                val_id = _emit_assign_from_call(f"{base.id}_item", value, awaited)
+            elif isinstance(value, ast.JoinedStr):
+                val_id = _emit_assign_from_fstring(f"{base.id}_item", value)
+            elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
+                val_id = _emit_assign_from_literal_or_pack(f"{base.id}_item", value)
+            elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                val_id = _emit_assign_from_comp(f"{base.id}_item", value)
+            elif isinstance(value, ast.Subscript):
+                val_id = _emit_assign_from_subscript(f"{base.id}_item", value)
+            elif isinstance(value, ast.Name):
+                val_id = _ssa_get(value.id)
+            else:
+                raise DSLParseError("Right hand side must be a call or f-string")
+
+            base_id = _ssa_get(base.id)
+            ssa = _ssa_new(base.id)
+            ops.append({
+                "id": ssa,
+                "op": "SET.item",
+                "deps": [base_id, val_id],
+                "args": {"key": key},
+            })
+            return ssa
+
         def _emit_cond(node: ast.AST, kind: str = "if") -> str:
             expr = _stringify(node)
             deps = [_ssa_get(n) for n in _collect_value_deps(node)]
@@ -349,28 +392,34 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             return ssa
 
         def _parse_stmt(stmt: ast.stmt) -> Optional[str]:
-            nonlocal returned_var, versions, latest, context_suffix
+            nonlocal returned_var, versions, latest, context_suffix, loop_depth
             if isinstance(stmt, ast.Assign):
-                if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
-                    raise DSLParseError("Assignment targets must be simple names")
-                var_name = stmt.targets[0].id
-                value = stmt.value
-                awaited = False
-                if isinstance(value, ast.Await):
-                    value = value.value
-                    awaited = True
-                if isinstance(value, ast.Call):
-                    return _emit_assign_from_call(var_name, value, awaited)
-                elif isinstance(value, ast.JoinedStr):
-                    return _emit_assign_from_fstring(var_name, value)
-                elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
-                    return _emit_assign_from_literal_or_pack(var_name, value)
-                elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
-                    return _emit_assign_from_comp(var_name, value)
-                elif isinstance(value, ast.Subscript):
-                    return _emit_assign_from_subscript(var_name, value)
+                if len(stmt.targets) != 1:
+                    raise DSLParseError("Assignment must have exactly one target")
+                target = stmt.targets[0]
+                if isinstance(target, ast.Name):
+                    var_name = target.id
+                    value = stmt.value
+                    awaited = False
+                    if isinstance(value, ast.Await):
+                        value = value.value
+                        awaited = True
+                    if isinstance(value, ast.Call):
+                        return _emit_assign_from_call(var_name, value, awaited)
+                    elif isinstance(value, ast.JoinedStr):
+                        return _emit_assign_from_fstring(var_name, value)
+                    elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
+                        return _emit_assign_from_literal_or_pack(var_name, value)
+                    elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                        return _emit_assign_from_comp(var_name, value)
+                    elif isinstance(value, ast.Subscript):
+                        return _emit_assign_from_subscript(var_name, value)
+                    else:
+                        raise DSLParseError("Right hand side must be a call or f-string")
+                elif isinstance(target, ast.Subscript):
+                    return _emit_assign_to_subscript(target, stmt.value)
                 else:
-                    raise DSLParseError("Right hand side must be a call or f-string")
+                    raise DSLParseError("Assignment targets must be simple names")
             elif isinstance(stmt, ast.Expr):
                 call = stmt.value
                 awaited = False
@@ -406,6 +455,9 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     _emit_expr_call(call, awaited)
                 return None
             elif isinstance(stmt, ast.Return):
+                if loop_depth > 0:
+                    ssa = _ssa_new("break")
+                    ops.append({"id": ssa, "op": "CTRL.break", "deps": [], "args": {}})
                 if isinstance(stmt.value, ast.Name):
                     returned_var = _ssa_get(stmt.value.id)
                 elif isinstance(stmt.value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
@@ -503,6 +555,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 saved_ctx = context_suffix
                 ctx_counts["loop"] += 1
                 context_suffix = f"loop{ctx_counts['loop']}"
+                loop_depth += 1
                 versions, latest = versions_body, latest_body
                 # Predefine loop target variables as items from iterator for dependency resolution
                 def _bind_loop_target(target: ast.AST):
@@ -529,6 +582,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 _bind_loop_target(stmt.target)
                 for inner in stmt.body:
                     _parse_stmt(inner)
+                loop_depth -= 1
                 versions_body, latest_body = versions, latest
                 versions, latest = saved_versions, saved_latest
                 context_suffix = saved_ctx
@@ -571,9 +625,11 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 saved_ctx = context_suffix
                 ctx_counts["while"] += 1
                 context_suffix = f"while{ctx_counts['while']}"
+                loop_depth += 1
                 versions, latest = versions_body, latest_body
                 for inner in stmt.body:
                     _parse_stmt(inner)
+                loop_depth -= 1
                 versions_body, latest_body = versions, latest
                 versions, latest = saved_versions, saved_latest
                 context_suffix = saved_ctx

@@ -242,9 +242,13 @@ async def flow():
     # merge ids
     all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
     crossing_info = None
+    result_dict = {}
     for x in all_ids:
         AG3.proc(x)
-        crossed = await AG4.op2(x)
+        try:
+            crossed = await AG4.op2(x)
+        except Exception as e:
+            continue
         if not crossed:
             continue
         approx_time = await AG3.op(x)
@@ -252,6 +256,7 @@ async def flow():
         lat = data["sensor_lat"]
         lon = data["sensor_lon"]
         AG4.proc(approx_time)
+        result_dict["approx_time"] = approx_time
         crossing_info = {
             "approx_time": approx_time,
             "details": await AG5.op3(approx_time),
@@ -259,7 +264,7 @@ async def flow():
             "lat": lat,
             "lon": lon,
         }
-        break
+        return result_dict
     if not crossing_info:
         return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
     return crossing_info

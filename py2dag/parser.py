@@ -62,7 +62,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         versions: Dict[str, int] = {}
         latest: Dict[str, str] = {}
         context_suffix: str = ""
-        ctx_counts: Dict[str, int] = {"if": 0, "loop": 0, "while": 0}
+        ctx_counts: Dict[str, int] = {"if": 0, "loop": 0, "while": 0, "except": 0}
 
         def _ssa_new(name: str) -> str:
             if not VALID_NAME_RE.match(name):
@@ -592,6 +592,29 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         "deps": [pre_latest[var], latest_body[var]],
                         "args": {"var": var},
                     })
+                return None
+            elif isinstance(stmt, ast.Try):
+                pre_versions = dict(versions)
+                pre_latest = dict(latest)
+                for inner in stmt.body:
+                    _parse_stmt(inner)
+                # else block executes only if no exception
+                for inner in getattr(stmt, "orelse", []):
+                    _parse_stmt(inner)
+                post_versions = versions
+                post_latest = latest
+                for handler in getattr(stmt, "handlers", []):
+                    saved_ctx = context_suffix
+                    ctx_counts["except"] = ctx_counts.get("except", 0) + 1
+                    context_suffix = f"except{ctx_counts['except']}"
+                    saved_versions, saved_latest = versions, latest
+                    versions, latest = dict(pre_versions), dict(pre_latest)
+                    for inner in handler.body:
+                        _parse_stmt(inner)
+                    versions, latest = post_versions, post_latest
+                    context_suffix = saved_ctx
+                for inner in getattr(stmt, "finalbody", []):
+                    _parse_stmt(inner)
                 return None
             elif isinstance(stmt, ast.Break):
                 ssa = _ssa_new("break")

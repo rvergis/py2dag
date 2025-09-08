@@ -603,7 +603,10 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 raise DSLParseError("Only assignments, control flow, settings/output calls, and return are allowed in function body")
 
         # Parse body sequentially; still require a resulting output
-        for i, stmt in enumerate(fn.body):  # type: ignore[attr-defined]
+        body = list(getattr(fn, "body", []))  # type: ignore[attr-defined]
+        if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant) and isinstance(getattr(body[0].value, "value", None), str):  # type: ignore[attr-defined]
+            body = body[1:]
+        for stmt in body:
             _parse_stmt(stmt)
 
         if not outputs:

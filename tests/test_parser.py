@@ -226,14 +226,23 @@ def test_flow_kitchen_sink():
 # Line 5
 
 async def flow():
+    """
+    Kitchen sink test for the flow function.
+    """
     # get ids
-    ids = await AG1.get_ids()
-    a_ids = await AG2.get_ids()
-    b_ids = await AG3.get_ids()
+    try:
+        ids = await AG1.get_ids()
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG1." }
+    try:
+        a_ids = await AG2.get_ids()
+        b_ids = await AG3.get_ids()
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
     # merge ids
     all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
     crossing_info = None
-    for x in xs:
+    for x in all_ids:
         AG3.proc(x)
         crossed = await AG4.op2(x)
         if not crossed:
@@ -251,7 +260,7 @@ async def flow():
             "lon": lon,
         }
         break
-    if crossing_info is None:
+    if not crossing_info:
         return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
     return crossing_info
 '''

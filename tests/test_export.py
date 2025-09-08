@@ -101,7 +101,7 @@ def kitchen_sink():
         c = TOOL6.post(d)
     while c:
         c = TOOL7.finalize(c)
-    output(c, as_="result.txt")
+    return c
 '''
     return parser.parse(code), code
 

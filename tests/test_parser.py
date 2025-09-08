@@ -90,6 +90,7 @@ def flow():
     return x
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     ops = plan["ops"]
     assert any(op["op"] == "COND.eval" and op["args"]["kind"] == "while" for op in ops)
     phi = next(op for op in ops if op["op"] == "PHI")
@@ -104,6 +105,7 @@ def flow():
     return {"ok": True}
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     ops = plan["ops"]
     assert any(op["op"] == "TEXT.format" for op in ops)
     last = ops[-1]
@@ -119,6 +121,7 @@ def flow():
     output(a, as_="o.txt")
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     assert plan.get("settings") == {"timeout": 30, "mode": "fast"}
     assert plan["outputs"][0]["as"] == "o.txt"
     assert plan["outputs"][0]["from"].endswith("_1")
@@ -140,6 +143,7 @@ def flow():
     return a
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     comp = next(op for op in plan["ops"] if op["op"].startswith("COMP."))
     assert len(comp["deps"]) == 1
 
@@ -170,6 +174,7 @@ async def flow():
     return crossing_info
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     comp = next(op for op in plan["ops"] if op["op"].startswith("COMP."))
     assert len(comp["deps"]) == 1
     field_op = next(op for op in plan["ops"] if op["op"] == "AG5.op3")
@@ -207,6 +212,7 @@ async def flow():
     return crossing_info
 '''
     plan = parser.parse(code)
+    assert plan["function"] == "flow"
     graph = cli._to_nodes_edges(plan)
     assert any(node["type"] == "break" for node in graph["nodes"])
 

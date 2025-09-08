@@ -343,26 +343,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 sl = sl.value  # type: ignore[assignment]
             key = _literal(sl)
 
-            awaited = False
-            if isinstance(value, ast.Await):
-                value = value.value
-                awaited = True
-
-            # Determine SSA id for RHS value
-            if isinstance(value, ast.Call):
-                val_id = _emit_assign_from_call(f"{base.id}_item", value, awaited)
-            elif isinstance(value, ast.JoinedStr):
-                val_id = _emit_assign_from_fstring(f"{base.id}_item", value)
-            elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
-                val_id = _emit_assign_from_literal_or_pack(f"{base.id}_item", value)
-            elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
-                val_id = _emit_assign_from_comp(f"{base.id}_item", value)
-            elif isinstance(value, ast.Subscript):
-                val_id = _emit_assign_from_subscript(f"{base.id}_item", value)
-            elif isinstance(value, ast.Name):
-                val_id = _ssa_get(value.id)
-            else:
-                raise DSLParseError("Right hand side must be a call or f-string")
+            val_id = _emit_value(f"{base.id}_item", value)
 
             base_id = _ssa_get(base.id)
             ssa = _ssa_new(base.id)
@@ -380,6 +361,51 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             ssa = _ssa_new("cond")
             ops.append({"id": ssa, "op": "COND.eval", "deps": deps, "args": {"expr": expr, "kind": kind}})
             return ssa
+
+        def _emit_assign_from_ifexp(var_name: str, node: ast.IfExp) -> str:
+            """Emit operations for an inline ``a if cond else b`` expression."""
+            cond_id = _emit_cond(node.test, kind="ifexp")
+
+            then_start = len(ops)
+            then_id = _emit_value(f"{var_name}_then", node.body)
+            if len(ops) > then_start:
+                first = ops[then_start]
+                deps0 = first.get("deps", []) or []
+                if cond_id not in deps0:
+                    first["deps"] = [*deps0, cond_id]
+
+            else_start = len(ops)
+            else_id = _emit_value(f"{var_name}_else", node.orelse)
+            if len(ops) > else_start:
+                first = ops[else_start]
+                deps0 = first.get("deps", []) or []
+                if cond_id not in deps0:
+                    first["deps"] = [*deps0, cond_id]
+
+            ssa = _ssa_new(var_name)
+            ops.append({"id": ssa, "op": "PHI", "deps": [then_id, else_id], "args": {"var": var_name}})
+            return ssa
+
+        def _emit_value(var_name: str, value: ast.AST) -> str:
+            awaited = False
+            if isinstance(value, ast.Await):
+                value = value.value
+                awaited = True
+            if isinstance(value, ast.Call):
+                return _emit_assign_from_call(var_name, value, awaited)
+            if isinstance(value, ast.JoinedStr):
+                return _emit_assign_from_fstring(var_name, value)
+            if isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
+                return _emit_assign_from_literal_or_pack(var_name, value)
+            if isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                return _emit_assign_from_comp(var_name, value)
+            if isinstance(value, ast.Subscript):
+                return _emit_assign_from_subscript(var_name, value)
+            if isinstance(value, ast.IfExp):
+                return _emit_assign_from_ifexp(var_name, value)
+            if isinstance(value, ast.Name):
+                return _ssa_get(value.id)
+            raise DSLParseError("Right hand side must be a call or f-string")
 
         def _emit_iter(node: ast.AST, target_label: Optional[str] = None) -> str:
             expr = _stringify(node)
@@ -399,23 +425,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 target = stmt.targets[0]
                 if isinstance(target, ast.Name):
                     var_name = target.id
-                    value = stmt.value
-                    awaited = False
-                    if isinstance(value, ast.Await):
-                        value = value.value
-                        awaited = True
-                    if isinstance(value, ast.Call):
-                        return _emit_assign_from_call(var_name, value, awaited)
-                    elif isinstance(value, ast.JoinedStr):
-                        return _emit_assign_from_fstring(var_name, value)
-                    elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
-                        return _emit_assign_from_literal_or_pack(var_name, value)
-                    elif isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
-                        return _emit_assign_from_comp(var_name, value)
-                    elif isinstance(value, ast.Subscript):
-                        return _emit_assign_from_subscript(var_name, value)
-                    else:
-                        raise DSLParseError("Right hand side must be a call or f-string")
+                    return _emit_value(var_name, stmt.value)
                 elif isinstance(target, ast.Subscript):
                     return _emit_assign_to_subscript(target, stmt.value)
                 else:
@@ -459,7 +469,18 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     ssa = _ssa_new("break")
                     ops.append({"id": ssa, "op": "CTRL.break", "deps": [], "args": {}})
                 if isinstance(stmt.value, ast.Name):
-                    returned_var = _ssa_get(stmt.value.id)
+                    name = stmt.value.id
+                    if name in latest:
+                        returned_var = _ssa_get(name)
+                    else:
+                        const_id = _ssa_new("return_value")
+                        ops.append({
+                            "id": const_id,
+                            "op": "CONST.value",
+                            "deps": [],
+                            "args": {"value": None},
+                        })
+                        returned_var = const_id
                 elif isinstance(stmt.value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
                     lit = _literal(stmt.value)
                     const_id = _ssa_new("return_value")

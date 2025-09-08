@@ -216,3 +216,47 @@ async def flow():
     graph = cli._to_nodes_edges(plan)
     assert any(node["type"] == "break" for node in graph["nodes"])
 
+
+def test_comments():
+    code = '''
+# Line 1
+# Line 2
+# Line 3
+# Line 4
+# Line 5
+
+async def flow():
+    # get ids
+    ids = await AG1.get_ids()
+    a_ids = await AG2.get_ids()
+    b_ids = await AG3.get_ids()
+    # merge ids
+    all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
+    crossing_info = None
+    for x in xs:
+        AG3.proc(x)
+        crossed = await AG4.op2(x)
+        if not crossed:
+            continue
+        approx_time = await AG3.op(x)
+        data = await AG4.op(approx_time)
+        lat = data["sensor_lat"]
+        lon = data["sensor_lon"]
+        AG4.proc(approx_time)
+        crossing_info = {
+            "approx_time": approx_time,
+            "details": await AG5.op3(approx_time),
+            "item": x,
+            "lat": lat,
+            "lon": lon,
+        }
+        break
+    if crossing_info is None:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
+    return crossing_info
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
+    graph = cli._to_nodes_edges(plan)
+    assert any(node["type"] == "break" for node in graph["nodes"])
+

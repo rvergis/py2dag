@@ -722,11 +722,28 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
         for stmt in body:
             _parse_stmt(stmt)
 
+        # If no explicit return was encountered, emit a terminal break node so
+        # that the plan represents function completion.
+        break_id: Optional[str] = None
+        if returned_var is None:
+            break_id = _ssa_new("break")
+            ops.append({"id": break_id, "op": "CTRL.break", "deps": [], "args": {}})
+
+        # If no outputs were produced, synthesise a default return of `None` so
+        # that parsing succeeds for empty functions.
+        if returned_var is None and not outputs:
+            const_id = _ssa_new("return_value")
+            ops.append({
+                "id": const_id,
+                "op": "CONST.value",
+                "deps": [],
+                "args": {"value": None},
+            })
+            returned_var = const_id
+
         if not outputs:
-            if returned_var is not None:
-                outputs.append({"from": returned_var, "as": "return"})
-            else:
-                raise DSLParseError("At least one output() call required")
+            outputs.append({"from": returned_var if returned_var is not None else break_id, "as": "return"})
+
         if len(ops) > 2000:
             raise DSLParseError("Too many operations")
 

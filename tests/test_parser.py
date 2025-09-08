@@ -313,7 +313,7 @@ async def flow():
     try:
         truck_ids = await AG1.get_ids("i")
     except Exception as e:
-        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG1." }
+        return { "status": "UNABLE_TO_PROCEED", "reason": f"Failed to get ids from AG1. {e}" }
     # Step 1
     try:
         red_truck_ids = await AG2.get_ids(ids=truck_ids, hex_color="#FF0000")

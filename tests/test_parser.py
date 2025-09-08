@@ -311,62 +311,88 @@ async def flow():
     """
     # get ids
     try:
-        i_ids = await AG1.get_ids("i")
+        truck_ids = await AG1.get_ids("i")
     except Exception as e:
         return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG1." }
     # Step 1
     try:
-        a_ids = await AG2.get_ids(ids=i_ids, hex_color="#FF0000")
+        red_truck_ids = await AG2.get_ids(ids=truck_ids, hex_color="#FF0000")
     except Exception as e:
         return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
-    # Step 2
-    try:
-        b_ids = await AG3.get_ids("b")
-    except Exception as e:
-        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
-    # merge ids
-    all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
     # Step 3
     crossing_found = False
     result_dict = {}
-    for x in all_ids:
-        AG3.proc(x)
+    for tid in red_truck_ids:
         try:
-            crossed = await AG4.op2(2, x)
+            crossed = await AG4.op2(2, tid)
         except Exception as e:
             continue # skip if error
+            
         if not crossed:
             continue # skip if error
         crossing_found = True
+        
         try:
-            approx_time = await AG3.op(x)
+            approx_time = await AG3.op(tid)
         except Exception as e:
             continue # skip if error
-        data = await AG4.op(approx_time)
-        lat = data["sensor_lat"]
-        lon = data["sensor_lon"]
-        AG4.proc(approx_time)
+            
+        try:
+            crossing_frame_id = await AG4.op(approx_time)
+        except Exception as e:
+            continue
+
+        try:
+            heading_target = await AG4.op3(approx_time)
+        except Exception as e:
+            heading_target = None # fallback
+
+        try:
+            freeway_name = await AG4.op4(approx_time)
+        except Exception as e:
+            freeway_name = None # fallback
+
+        try:
+            exit_ramp_data = await AG4.op5(approx_time)
+        except Exception as e:
+            exit_ramp_data = None # fallback
+
+        # Build result dictionary
+        result_dict["approx_time"] = approx_time # comment
+        result_dict["frame_id"] = crossing_frame_id
+        result_dict["crossing_vehicle_id"] = tid
+
         # comment 
         try:
             obj_class = await AG5.op4(approx_time)
         except Exception as e:
             obj_class = None
-        result_dict["obj_class"] = obj_class if obj_class else "unknown"
-        result_dict["approx_time"] = approx_time # comment
-        result_dict["details"] = await AG5.op3(approx_time)
-        result_dict["item"] = x
-        result_dict["key2"] = data.get("key2")
-        result_dict["lat"] = lat if lat else None
-        result_dict["lon"] = lon if lon else None
-        if isinstance(data, dict) and "key1" in data:
-            result_dict["key1"] = data.get("key1")
+        
+        result_dict["crossing_vehicle_type"] = obj_class if obj_class else "unknown"
+        result_dict["heading_target_approximate_heading"] = heading_target if heading_target else "unknown"
+        result_dict["freeway_name"] = freeway_name if freeway_name else "unknown"
+
+        if isinstance(exit_ramp_data, dict) and "exit" in exit_ramp_data:
+            result_dict["next_freeway_exit"] = exit_ramp_data.get("exit")
         else:
-            result_dict["key1"] = None
+            result_dict["next_freeway_exit"] = None
+
         # comment
         return result_dict
     if not crossing_found:
         return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
     return result_dict
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
+    graph = cli._to_nodes_edges(plan)
+    assert any(node["type"] == "break" for node in graph["nodes"])
+
+
+def test_basic():
+    code = '''
+async def flow():
+    pass
 '''
     plan = parser.parse(code)
     assert plan["function"] == "flow"

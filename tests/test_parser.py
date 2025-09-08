@@ -217,7 +217,7 @@ async def flow():
     assert any(node["type"] == "break" for node in graph["nodes"])
 
 
-def test_comments():
+def test_flow_kitchen_sink():
     code = '''
 # Line 1
 # Line 2

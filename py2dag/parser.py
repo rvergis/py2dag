@@ -108,7 +108,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             deps: List[str] = []
             for n in ast.walk(node):
                 if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
-                    if n.id not in callees and n.id not in deps:
+                    if n.id not in callees and n.id not in deps and n.id in latest:
                         deps.append(n.id)
             return deps
 

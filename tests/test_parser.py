@@ -234,47 +234,139 @@ async def flow():
         ids = await AG1.get_ids()
     except Exception as e:
         return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG1." }
+    # Step 1
     try:
         a_ids = await AG2.get_ids()
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
+    # Step 2
+    try:
         b_ids = await AG3.get_ids()
     except Exception as e:
         return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
     # merge ids
     all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
+    # Step 3
     crossing_found = False
     result_dict = {}
     for x in all_ids:
         AG3.proc(x)
         try:
-            crossed = await AG4.op2(x)
+            crossed = await AG4.op2(2, x)
         except Exception as e:
             continue # skip if error
         if not crossed:
-            continue
+            continue # skip if error
         crossing_found = True
-        approx_time = await AG3.op(x)
+        try:
+            approx_time = await AG3.op(x)
+        except Exception as e:
+            continue # skip if error
         data = await AG4.op(approx_time)
         lat = data["sensor_lat"]
         lon = data["sensor_lon"]
         AG4.proc(approx_time)
-        if isinstance(data, dict) and "key1" in data:
-            result_dict["key1"] = data.get("key1")
-        else:
-            result_dict["key1"] = None
+        # comment 
         try:
             obj_class = await AG5.op4(approx_time)
         except Exception as e:
             obj_class = None
         result_dict["obj_class"] = obj_class if obj_class else "unknown"
-        result_dict["approx_time"] = approx_time
+        result_dict["approx_time"] = approx_time # comment
         result_dict["details"] = await AG5.op3(approx_time)
         result_dict["item"] = x
-        result_dict["lat"] = lat
-        result_dict["lon"] = lon
+        result_dict["key2"] = data.get("key2")
+        result_dict["lat"] = lat if lat else None
+        result_dict["lon"] = lon if lon else None
+        if isinstance(data, dict) and "key1" in data:
+            result_dict["key1"] = data.get("key1")
+        else:
+            result_dict["key1"] = None
+        # comment
         return result_dict
-    if not crossing_info:
+    if not crossing_found:
         return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
-    return crossing_info
+    return result_dict
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
+    graph = cli._to_nodes_edges(plan)
+    assert any(node["type"] == "break" for node in graph["nodes"])
+
+
+def test_flow_kitchen_sink2():
+    code = '''
+# Line 1
+# Line 2
+# Line 3
+# Line 4
+# Line 5
+
+async def flow():
+    """
+    Kitchen sink test for the flow function.
+    Workflow:
+        - comment line 1
+        - comment line 2
+    """
+    # get ids
+    try:
+        i_ids = await AG1.get_ids("i")
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG1." }
+    # Step 1
+    try:
+        a_ids = await AG2.get_ids(ids=i_ids, hex_color="#FF0000")
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
+    # Step 2
+    try:
+        b_ids = await AG3.get_ids("b")
+    except Exception as e:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "Failed to get ids from AG2 or AG3." }
+    # merge ids
+    all_ids = await AG4.merge_list([ids, a_ids, b_ids])    
+    # Step 3
+    crossing_found = False
+    result_dict = {}
+    for x in all_ids:
+        AG3.proc(x)
+        try:
+            crossed = await AG4.op2(2, x)
+        except Exception as e:
+            continue # skip if error
+        if not crossed:
+            continue # skip if error
+        crossing_found = True
+        try:
+            approx_time = await AG3.op(x)
+        except Exception as e:
+            continue # skip if error
+        data = await AG4.op(approx_time)
+        lat = data["sensor_lat"]
+        lon = data["sensor_lon"]
+        AG4.proc(approx_time)
+        # comment 
+        try:
+            obj_class = await AG5.op4(approx_time)
+        except Exception as e:
+            obj_class = None
+        result_dict["obj_class"] = obj_class if obj_class else "unknown"
+        result_dict["approx_time"] = approx_time # comment
+        result_dict["details"] = await AG5.op3(approx_time)
+        result_dict["item"] = x
+        result_dict["key2"] = data.get("key2")
+        result_dict["lat"] = lat if lat else None
+        result_dict["lon"] = lon if lon else None
+        if isinstance(data, dict) and "key1" in data:
+            result_dict["key1"] = data.get("key1")
+        else:
+            result_dict["key1"] = None
+        # comment
+        return result_dict
+    if not crossing_found:
+        return { "status": "UNABLE_TO_PROCEED", "reason": "No valid crossing information found." }
+    return result_dict
 '''
     plan = parser.parse(code)
     assert plan["function"] == "flow"

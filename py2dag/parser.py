@@ -14,6 +14,20 @@ def _literal(node: ast.AST) -> Any:
     """Return a Python literal from an AST node or raise DSLParseError."""
     if isinstance(node, ast.Constant):
         return node.value
+    if isinstance(node, ast.JoinedStr):
+        parts: List[str] = []
+        for value in node.values:
+            if isinstance(value, ast.Constant):
+                parts.append(str(value.value))
+            elif isinstance(value, ast.FormattedValue):
+                try:
+                    expr = ast.unparse(value.value)  # type: ignore[attr-defined]
+                except Exception:
+                    expr = "?"
+                parts.append("{" + expr + "}")
+            else:
+                raise DSLParseError("Keyword argument values must be JSON-serialisable literals")
+        return "".join(parts)
     if isinstance(node, (ast.List, ast.Tuple)):
         return [_literal(elt) for elt in node.elts]
     if isinstance(node, ast.Dict):

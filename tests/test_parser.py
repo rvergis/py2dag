@@ -178,7 +178,11 @@ async def flow():
 
 def test_break_node_type():
     code = '''
+# Test for break node type
 async def flow():
+    """
+        This is a test for the break node type.
+    """
     a = AG1.src()
     xs = await AG1.op(param1=a, param2=42)
     crossing_info = None

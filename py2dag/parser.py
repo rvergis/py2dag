@@ -131,7 +131,7 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         return list(prev.get("deps", []))
                 return [ssa_var]
 
-            for arg in call.args:
+            for idx, arg in enumerate(call.args):
                 if isinstance(arg, ast.Starred):
                     star_val = arg.value
                     if isinstance(star_val, ast.Name):
@@ -156,7 +156,20 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         deps.append(_ssa_get(elt.id))
                         dep_labels.append("")
                 else:
-                    raise DSLParseError("Positional args must be variable names or lists/tuples of names")
+                    # Allow literal positional arguments by emitting a CONST node
+                    try:
+                        lit = _literal(arg)
+                    except DSLParseError:
+                        raise DSLParseError("Positional args must be variable names or lists/tuples of names or literals")
+                    const_id = _ssa_new(f"{var_name}_arg{idx}")
+                    ops.append({
+                        "id": const_id,
+                        "op": "CONST.value",
+                        "deps": [],
+                        "args": {"value": lit},
+                    })
+                    deps.append(const_id)
+                    dep_labels.append("")
 
             kwargs: Dict[str, Any] = {}
             for kw in call.keywords:

@@ -257,6 +257,10 @@ async def flow():
         lat = data["sensor_lat"]
         lon = data["sensor_lon"]
         AG4.proc(approx_time)
+        if isinstance(data, dict) and "key1" in data:
+            result_dict["key1"] = data.get("key1")
+        else:
+            result_dict["key1"] = None
         try:
             obj_class = await AG5.op4(approx_time)
         except Exception as e:

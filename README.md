@@ -1,5 +1,14 @@
 # py2dag
-Convert Python function plans to a DAG (JSON, pseudo, optional SVG).
+Convert Python function plans to a DAG (JSON, pseudo, optional HTML/SVG).
+
+## Features
+
+- Writes `plan.json` with explicit `nodes` and `edges` for downstream tools.
+- Generates human-readable pseudo code at `plan.pseudo`.
+- Optional exports:
+  - `--html` for an interactive Dagre graph with color-coded nodes.
+  - `--svg` for a Graphviz-rendered SVG.
+- Node colors are chosen deterministically so the same op type is colored consistently across runs.
 
 ## Install
 
@@ -45,9 +54,9 @@ make run FILE=path/to/your_file.py ARGS=--html
 - Run the installed CLI (after `pip install py2dag`):
 
 ```
-py2dag path/to/your_file.py --html
+py2dag path/to/your_file.py --html  # interactive HTML
+py2dag path/to/your_file.py --svg   # Graphviz SVG
 ```
-
 
 - Or directly with Python (inside venv):
 
@@ -55,7 +64,7 @@ py2dag path/to/your_file.py --html
 poetry run python cli.py path/to/your_file.py --html
 ```
 
-This generates `plan.json`, `plan.pseudo`, and if `--html` is used, `plan.html`.
+This generates `plan.json`, `plan.pseudo`, and if `--html`/`--svg` is used, `plan.html` or `plan.svg`.
 
 - Function name: By default the tool auto-detects a suitable function in the file. To target a specific function, pass `--func NAME`.
 

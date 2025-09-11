@@ -298,8 +298,14 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                             tmp_id = _emit_assign_from_call(f"{var_name}_field", v_node)
                             deps.append(tmp_id)
                         else:
-                            # Synthesize const for literal value
-                            lit_val = _literal(v_node)
+                            # Synthesize const for literal or arbitrary expression value
+                            try:
+                                lit_val = _literal(v_node)
+                            except DSLParseError:
+                                try:
+                                    lit_val = ast.unparse(v_node)  # type: ignore[attr-defined]
+                                except Exception:
+                                    lit_val = v_node.__class__.__name__
                             tmp = _ssa_new(f"{var_name}_lit")
                             ops.append({
                                 "id": tmp,

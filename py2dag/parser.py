@@ -509,15 +509,19 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         })
                         returned_var = const_id
                 elif isinstance(stmt.value, (ast.Constant, ast.List, ast.Tuple, ast.Dict)):
-                    lit = _literal(stmt.value)
-                    const_id = _ssa_new("return_value")
-                    ops.append({
-                        "id": const_id,
-                        "op": "CONST.value",
-                        "deps": [],
-                        "args": {"value": lit},
-                    })
-                    returned_var = const_id
+                    try:
+                        lit = _literal(stmt.value)
+                    except DSLParseError:
+                        returned_var = _emit_assign_from_literal_or_pack("return_value", stmt.value)
+                    else:
+                        const_id = _ssa_new("return_value")
+                        ops.append({
+                            "id": const_id,
+                            "op": "CONST.value",
+                            "deps": [],
+                            "args": {"value": lit},
+                        })
+                        returned_var = const_id
                 else:
                     raise DSLParseError("return must return a variable name or literal")
                 return None

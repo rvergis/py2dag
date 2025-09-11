@@ -397,6 +397,8 @@ async def flow():
         for fid in sorted(frame_ids):
             return {
                 "elapsed_time": fid,
+                "flag1": True if fid % 2 == 0 else False,
+                "flag2": "yes" if f_id in red_truck_ids else "no",
             }
 '''
     plan = parser.parse(code)

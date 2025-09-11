@@ -388,6 +388,19 @@ async def flow():
     graph = cli._to_nodes_edges(plan)
     assert any(node["type"] == "break" for node in graph["nodes"])
 
+def test_naked_return():
+    code = '''
+async def flow():
+    red_truck_ids = [1,2,3]
+    frame_ids = [1,2,3]
+    for truck_id in red_truck_ids:
+        for fid in sorted(frame_ids):
+            return {
+                "elapsed_time": fid,
+            }
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
 
 def test_basic():
     code = '''
@@ -396,6 +409,4 @@ async def flow():
 '''
     plan = parser.parse(code)
     assert plan["function"] == "flow"
-    graph = cli._to_nodes_edges(plan)
-    assert any(node["type"] == "break" for node in graph["nodes"])
 

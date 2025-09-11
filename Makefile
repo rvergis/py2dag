@@ -7,7 +7,7 @@ PYTHON ?= python3
 WITH_SVG ?= 1
 
 test:
-	$(POETRY) run pytest -s tests
+	$(POETRY) run pytest -s tests -v
 
 setup:
 	# Ensure in-project .venv and install dependencies (optionally with svg extra)

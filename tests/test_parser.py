@@ -388,7 +388,7 @@ async def flow():
     graph = cli._to_nodes_edges(plan)
     assert any(node["type"] == "break" for node in graph["nodes"])
 
-def test_naked_return():
+def test_return():
     code = '''
 async def flow():
     red_truck_ids = [1,2,3]

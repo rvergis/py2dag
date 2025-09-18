@@ -41,6 +41,20 @@ jobs:
           git commit -m "chore(release): v${{ steps.bump.outputs.version }}"
           git tag v${{ steps.bump.outputs.version }}
 
+      - name: Install build backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
       - name: Push commit and tag
         env:
           VERSION: ${{ steps.bump.outputs.version }}

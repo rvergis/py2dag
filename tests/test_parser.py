@@ -404,6 +404,20 @@ async def flow():
     plan = parser.parse(code)
     assert plan["function"] == "flow"
 
+
+def test_unsupported_rhs_reports_expression():
+    code = '''
+def flow():
+    truck_ids = []
+    bus_ids = []
+    candidate_ids = truck_ids + bus_ids
+    return {}
+'''
+    with pytest.raises(parser.DSLParseError) as excinfo:
+        parser.parse(code)
+    assert "truck_ids + bus_ids" in str(excinfo.value)
+
+
 def test_basic():
     code = '''
 async def flow():

@@ -438,7 +438,8 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 return _emit_assign_from_ifexp(var_name, value)
             if isinstance(value, ast.Name):
                 return _ssa_get(value.id)
-            raise DSLParseError("Right hand side must be a call or f-string")
+            expr = _stringify(value)
+            raise DSLParseError(f"Unsupported right hand side expression: {expr}")
 
         def _emit_iter(node: ast.AST, target_label: Optional[str] = None) -> str:
             expr = _stringify(node)
@@ -788,9 +789,11 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             raise DSLParseError(f"Function {function_name!r} not found")
         return _parse_fn(fn)
     else:
-        last_err: Optional[Exception] = None
+        last_err: Optional[DSLParseError] = None
+        fn_count = 0
         for node in module.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                fn_count += 1
                 try:
                     return _parse_fn(node)
                 except DSLParseError as e:
@@ -798,6 +801,8 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     continue
         # If we got here, either there are no functions or none matched the DSL
         if last_err is not None:
+            if fn_count == 1:
+                raise last_err
             raise DSLParseError("No suitable function matched the DSL; specify --func to disambiguate") from last_err
         raise DSLParseError("No function definitions found in source")
 

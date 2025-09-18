@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "py2dag"
-version = "0.3.19"
+version = "0.3.20"
 description = "Convert Python function plans to DAG (JSON, pseudo, optional SVG)."
 authors = ["rvergis"]
 license = "MIT"

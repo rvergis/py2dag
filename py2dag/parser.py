@@ -419,6 +419,20 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
             ops.append({"id": ssa, "op": "PHI", "deps": [then_id, else_id], "args": {"var": var_name}})
             return ssa
 
+        def _emit_assign_from_expr(var_name: str, node: ast.AST) -> str:
+            """Emit a generic expression evaluation node for supported AST expressions."""
+
+            deps = [_ssa_get(name) for name in _collect_value_deps(node)]
+            expr = _stringify(node)
+            ssa = _ssa_new(var_name)
+            ops.append({
+                "id": ssa,
+                "op": "EXPR.eval",
+                "deps": deps,
+                "args": {"expr": expr},
+            })
+            return ssa
+
         def _emit_value(var_name: str, value: ast.AST) -> str:
             awaited = False
             if isinstance(value, ast.Await):
@@ -438,6 +452,8 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                 return _emit_assign_from_ifexp(var_name, value)
             if isinstance(value, ast.Name):
                 return _ssa_get(value.id)
+            if isinstance(value, (ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare)):
+                return _emit_assign_from_expr(var_name, value)
             expr = _stringify(value)
             raise DSLParseError(f"Unsupported right hand side expression: {expr}")
 

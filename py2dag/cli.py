@@ -91,6 +91,8 @@ def _to_nodes_edges(plan: dict) -> dict:
             if tgt:
                 return f"for {tgt} in {expr}"
             return f"iter {expr}"
+        if op_name == "EXPR.eval":
+            return str(args.get("expr"))
         if op_name == "ITER.item":
             return str(args.get("target") or "item")
         if op_name == "PHI":
@@ -160,6 +162,8 @@ def _to_nodes_edges(plan: dict) -> dict:
         if op_name.startswith("COMP."):
             comp = op_name.split(".", 1)[1]
             return f"comp:{comp}"
+        if op_name == "EXPR.eval":
+            return "expr"
         # Default: treat as a call/tool node
         return "call"
 

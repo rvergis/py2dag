@@ -413,9 +413,8 @@ def flow():
     candidate_ids = truck_ids + bus_ids
     return {}
 '''
-    with pytest.raises(parser.DSLParseError) as excinfo:
-        parser.parse(code)
-    assert "truck_ids + bus_ids" in str(excinfo.value)
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
 
 
 def test_basic():

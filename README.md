@@ -110,6 +110,8 @@ make patch        # bumps version, commits, and tags vX.Y.Z
 make release      # pushes commits and tags to GitHub (triggers publish)
 ```
 
+Or trigger the "Patch release" GitHub Action from the Actions tab to bump, commit, tag, and push directly from GitHub.
+
 Or push tags manually:
 
 ```

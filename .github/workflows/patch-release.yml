@@ -1,0 +1,49 @@
+name: Patch release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: "Branch to release from"
+        required: false
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.release_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          python scripts/version_utils.py bump
+          VERSION=$(python scripts/version_utils.py print)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore(release): v${{ steps.bump.outputs.version }}"
+          git tag v${{ steps.bump.outputs.version }}
+
+      - name: Push commit and tag
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git push origin HEAD
+          git push origin "refs/tags/v$VERSION"

@@ -174,16 +174,24 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                     try:
                         lit = _literal(arg)
                     except DSLParseError:
-                        raise DSLParseError("Positional args must be variable names or lists/tuples of names or literals")
-                    const_id = _ssa_new(f"{var_name}_arg{idx}")
-                    ops.append({
-                        "id": const_id,
-                        "op": "CONST.value",
-                        "deps": [],
-                        "args": {"value": lit},
-                    })
-                    deps.append(const_id)
-                    dep_labels.append("")
+                        try:
+                            val_id = _emit_value(f"{var_name}_arg{idx}", arg)
+                        except DSLParseError as inner_exc:
+                            raise DSLParseError(
+                                "Positional args must be variable names or lists/tuples of names or literals"
+                            ) from inner_exc
+                        deps.append(val_id)
+                        dep_labels.append("")
+                    else:
+                        const_id = _ssa_new(f"{var_name}_arg{idx}")
+                        ops.append({
+                            "id": const_id,
+                            "op": "CONST.value",
+                            "deps": [],
+                            "args": {"value": lit},
+                        })
+                        deps.append(const_id)
+                        dep_labels.append("")
 
             kwargs: Dict[str, Any] = {}
             for kw in call.keywords:

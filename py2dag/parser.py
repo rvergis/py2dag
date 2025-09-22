@@ -203,19 +203,25 @@ def parse(source: str, function_name: Optional[str] = None) -> Dict[str, Any]:
                         deps.append(_ssa_get(kw.value.id))
                         dep_labels.append(kw.arg or "")
                     else:
-                        lit = _literal(kw.value)
-                        kwargs[kw.arg] = lit
-                        const_id = _ssa_new(f"{var_name}_{kw.arg}")
-                        ops.append(
-                            {
-                                "id": const_id,
-                                "op": "CONST.value",
-                                "deps": [],
-                                "args": {"value": lit},
-                            }
-                        )
-                        deps.append(const_id)
-                        dep_labels.append(kw.arg or "")
+                        try:
+                            lit = _literal(kw.value)
+                        except DSLParseError:
+                            val_id = _emit_value(f"{var_name}_{kw.arg}", kw.value)
+                            deps.append(val_id)
+                            dep_labels.append(kw.arg or "")
+                        else:
+                            kwargs[kw.arg] = lit
+                            const_id = _ssa_new(f"{var_name}_{kw.arg}")
+                            ops.append(
+                                {
+                                    "id": const_id,
+                                    "op": "CONST.value",
+                                    "deps": [],
+                                    "args": {"value": lit},
+                                }
+                            )
+                            deps.append(const_id)
+                            dep_labels.append(kw.arg or "")
 
             ssa = _ssa_new(var_name)
             op: Dict[str, Any] = {"id": ssa, "op": op_name, "deps": deps, "args": kwargs, "dep_labels": dep_labels}

@@ -425,3 +425,12 @@ async def flow():
     plan = parser.parse(code)
     assert plan["function"] == "flow"
 
+def test_keyword_value_non_literal():
+    code = '''
+def flow():
+    data = { "param": 42 }
+    result = TOOL.op(param=data["param"])
+    return result
+'''
+    plan = parser.parse(code)
+    assert plan["function"] == "flow"
